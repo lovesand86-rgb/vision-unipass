@@ -1,0 +1,16 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>비전 어시스트</title><link rel="icon" href="assist-icon.png"><link rel="stylesheet" href="assist.css"></head><body>
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-history" viewBox="0 0 32 32"><path d="M8 8V5h17v19h-4M6 10h15v18H6zM10 15h7m-7 5h7"/></symbol>
+<symbol id="i-new" viewBox="0 0 32 32"><path d="M19 4H7v24h18V10l-6-6v7h6M11 19h10m-5-5v10"/></symbol>
+<symbol id="i-resume" viewBox="0 0 32 32"><path d="M5 11a12 12 0 1 1-1 9M4 5v7h7m5-4v9l6 3"/></symbol>
+<symbol id="i-update" viewBox="0 0 32 32"><path d="M7 8a12 12 0 0 1 20 8M25 4l2 7-7-1M25 24A12 12 0 0 1 5 16m2 12-2-7 7 1m4-10v10m-4-4 4 4 4-4"/></symbol>
+<symbol id="i-gear" viewBox="0 0 32 32"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 32 32"><path d="M26 16H7m8-8-8 8 8 8"/></symbol>
+</defs></svg>
+<header><a href="#" id="brand" class="brand"><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><button id="settings" class="icon-button" aria-label="설정"><svg><use href="#i-gear"/></svg></button></header>
+<main id="main" tabindex="-1"></main>
+<footer><span><i class="dot"></i>내 PC에 저장되는 작업 공간</span><span id="version">v1.0.0</span></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dialog"><form method="dialog"><button class="close" aria-label="닫기">×</button></form><div id="dialog-content"></div></dialog>
+<input id="import-file" type="file" accept=".json,.txt,.tsv" hidden>
+<script type="module" src="assist.js"></script></body></html>

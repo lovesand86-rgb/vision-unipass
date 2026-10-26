@@ -1,1 +1,60 @@
-# vision-unipass
+# 비전 어시스트 1.0.0
+
+Windows 실행기 하나로 기존 Chrome 확장 기능과 새로운 자료 입력 화면을 여는 프로그램입니다. 기존 0.9.0의 입력 모듈 21개를 그대로 보존했습니다. 현재 버전은 Windows x64용 검토 후보이며, 실제 PC의 최초 연결 및 실제 UNI-PASS 입력 확인이 남아 있습니다.
+
+## 사용
+
+1. `비전 어시스트.exe`를 처음 한 번 실행합니다. Python·Node·.NET 별도 설치가 필요하지 않습니다. Google Chrome은 필요합니다.
+2. 기존 확장이 발견되면 해당 폴더와 Chrome 프로필을 선택합니다. 원래 등록 경로와 `cargo-target.js`, Chrome 확장 저장소를 유지합니다. 비전 도구 탭만 닫고 UNI-PASS 신청서 탭은 유지합니다.
+3. 최초 연결 화면의 안내대로 확장 새로고침 및 새 권한 확인을 한 번 진행합니다. 새로 설치하는 경우 Chrome에서 개발자 모드와 ‘압축해제된 확장 프로그램을 로드합니다’가 처음 한 번 필요합니다.
+4. 이후 바탕화면의 **비전 어시스트**를 더블클릭합니다. 실행기는 로그인된 기존 Chrome 프로필에서 독립 앱 창을 엽니다.
+
+프로그램은 `%LOCALAPPDATA%\VisionAssist`에 실행기·연결 설정·업데이트 백업을 보관합니다. 기존 확장의 파일 경로는 이동하지 않습니다. Windows 전체 설정 또는 관리자 영역을 변경하지 않으며 현재 사용자에 한해 Native Messaging 연결을 등록합니다. 자동 시작/상주 서비스는 설치하지 않습니다.
+
+## 네 가지 메뉴
+
+- **실적 기반 입력:** 기존 검색·복사와 품목·화물·공통사항·사진·검증/저장/최종 전송 도구로 연결합니다. 설치된 개인 작업 설정을 재사용합니다. 공개 패키지는 개인 작업값을 포함하지 않습니다.
+- **신규 자료 입력:** 항목/값/출처를 입력하거나 엑셀의 3열을 붙여넣고 원문 확인 여부를 기록합니다. 실제 열린 UNI-PASS 탭의 편집 가능한 입력칸을 읽어 연결하고, 변경 전/후를 검토한 뒤 반영합니다. 연결은 작업에 보존됩니다. 화면 탭을 바꾸면 다시 읽어야 합니다.
+- **작업 이어하기:** 새 자료 초안·입력 시도·결과를 복원합니다. 기존 도구의 기록은 해당 도구에서 이어갑니다.
+- **업데이트 확인:** 게시된 버전을 확인하고 다운로드/해시 검증/백업/교체/이전 버전 복구를 실행합니다. 다시 열기를 선택하면 실행기가 앱 창을 다시 열고 확장이 재로드됩니다. 실행 시 자동 확인은 설정에서 선택하며 기본은 꺼짐입니다.
+
+오른쪽 위 설정에서 업데이트 확인 옵션과 작업 백업/가져오기를 사용할 수 있습니다. 작업 자료는 해당 Chrome 프로필의 확장 저장소에 보관됩니다. 확장 제거는 저장 자료를 지울 수 있습니다. 백업 JSON에는 사용자가 입력한 업무 자료가 들어 있으므로 회사 자료와 같이 취급합니다. 외부 전송이나 자동 업로드는 없습니다.
+
+## 신규 자료 입력의 범위
+
+실제로 관측한 `CSW0101001S_` 입력칸 중 표시된 일반 텍스트/날짜/숫자/전화/선택/다중행 입력만 지원합니다. 비밀번호, 인증, 토큰, 신청번호/채번 관련 입력은 연결 대상에서 제외합니다. 숨김·읽기 전용·비활성·중복 ID 입력칸은 제외합니다. 선택 항목은 화면의 실제 코드/이름과 맞아야 합니다.
+
+새 입력 기능은 화면 버튼을 클릭하지 않습니다. 원재료 표의 신규 행 생성, 제조업소/코드 조회 팝업, 사진 업로드, 기관별 필수/조건부 필수 업무규칙을 모두 자동화한 정밀신고 완성본은 아닙니다. 미리 정리한 데이터를 실제 존재하는 입력칸에 연결하여 자동 입력하는 단계까지 구현했습니다. 해당 화면 구성 및 업무 판단은 실제 건에서 확인해야 합니다. 기존 0.9.0 도구의 별도 저장·전송 기능은 보존되며 신규 입력 메뉴와 구분됩니다.
+
+## 업데이트 배포
+
+- 기존 공개 저장소의 공식 경로를 유지합니다: `https://github.com/lovesand86-rgb/vision-unipass/releases/latest/download/update.json`
+- 빌드 도구가 생성한 `artifacts/update.json`, `artifacts/vision-extension-core.zip` 두 파일을 동일한 GitHub 릴리스에 게시해야 실제 업데이트가 내려옵니다.
+- GitHub Actions의 Release Windows 워크플로가 검사와 빌드 후 실행 파일 및 업데이트 파일을 함께 게시합니다. 조회 시 릴리스가 없으면 ‘업데이트 미게시’ 안내이며 ‘최신 버전’으로 표시하지 않습니다.
+- 일반적인 화면·확장 기능 개선은 앱 안에서 적용합니다. 이 패키지의 업데이트 대상은 확장 코드입니다. 실행기 자체의 새로운 네이티브 기능이 필요하면 새 실행기 버전의 배포가 별도로 필요합니다.
+- `cargo-target.js`는 업데이트에 포함하지 않으며, 기존 설정과 Chrome 확장 ID를 유지합니다. 루트의 소스용 설정은 모두 null입니다.
+- 개인용 작업 JSON, 연락처, 사진, 원본 자료, 테스트용 Chrome 프로필은 배포하지 않습니다.
+
+## 개발과 재현
+
+```sh
+node --test --test-isolation=none tests/model.test.mjs
+VISION_TEST_BROWSER=/path/to/chrome-for-testing node tests/browser.mjs
+dotnet run --project tests/CoreTests.csproj
+python tools/package.py
+dotnet publish host/VisionAssist.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/windows
+```
+
+Node UI 테스트에는 Playwright와 Chrome for Testing을 사용합니다. 테스트의 UNI-PASS URL은 전부 합성 HTML로 가로채며 실제 기관 요청은 없습니다. 사용자 프로필과 다른 임시 프로필에서 실행합니다. 브라우저 테스트의 합성 저장소는 제품 ZIP에 포함하지 않습니다.
+
+`tools/package.py`는 `cargo-target.js`를 제외하고 단일 깊이 파일을 묶어 해시를 작성합니다. 현재 출력 version/tag는 확장 manifest에서 읽습니다. Windows 아이콘은 `artifacts/vision-assist.ico`에 있으며 PNG/SVG 아트워크가 아닌 단순 V자 제품 아이콘입니다. 실행 파일 빌드는 Microsoft 공식 .NET SDK와 런타임 패키지를 사용했습니다. 배포 시 해당 런타임 고지를 보존합니다.
+
+## 이번 검증
+
+- 데이터 모델 5개 테스트 통과
+- .NET 업데이트/복구 18개 검사 통과
+- 실제 Chrome 확장 로드 및 14개 UI/합성 입력 검증 통과, pageerror 0
+- 기존 자동화 JavaScript 21개 원본과 일치
+- Windows x64 단일 EXE 크로스 빌드 성공
+
+실제 Windows 설치·Native Messaging·앱 창 열기·자동 재로드, 회사 Chrome 프로필 및 실제 UNI-PASS 페이지의 입력/저장/전송은 이 Linux 환경에서 검증하지 않았습니다. 실제 정부 전송은 수행하지 않았습니다. 실행 파일은 Authenticode 서명되지 않은 검토 후보입니다.

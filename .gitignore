@@ -1,0 +1,11 @@
+artifacts/windows/
+host/bin/
+host/obj/
+tests/bin/
+tests/obj/
+*.pdb
+*.log
+node_modules/
+dist/
+artifacts/update.json
+artifacts/vision-extension-core.zip

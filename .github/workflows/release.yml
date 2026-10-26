@@ -1,0 +1,68 @@
+name: Release Windows
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release-1.0.0
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.427'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check model and updater recovery
+        shell: pwsh
+        run: |
+          node --test --test-isolation=none tests/model.test.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet run --project tests/CoreTests.csproj
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Package and build Windows executable
+        shell: pwsh
+        run: |
+          python tools/package.py
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          dotnet publish host/VisionAssist.csproj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.33 -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/windows
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Prepare downloadable files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist -Force
+          Copy-Item artifacts/windows/VisionAssist.exe dist/VisionAssist-1.0.0-win-x64.exe
+          Copy-Item artifacts/update.json,artifacts/vision-extension-core.zip,release/START-HERE.ko.txt,release/VisionAssist-home.png dist/
+          git archive --format=zip --output=dist/VisionAssist-1.0.0-source.zip HEAD
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $lines = Get-ChildItem dist -File | Sort-Object Name | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
+          $lines | Set-Content -Encoding utf8NoBOM dist/SHA256SUMS.txt
+      - name: Upload and publish reviewed release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view v1.0.0 --json isDraft
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          gh release edit v1.0.0 --target "${{ github.sha }}" --notes-file release/NOTES.ko.md
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $assets = (Get-ChildItem dist -File).FullName
+          gh release upload v1.0.0 @assets --clobber
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $release = gh release view v1.0.0 --json assets | ConvertFrom-Json
+          if ($release.assets.Count -ne 7) { throw 'Expected seven release assets.' }
+          gh release edit v1.0.0 --draft=false --latest
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

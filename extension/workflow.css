@@ -1,0 +1,7 @@
+body{margin:0;background:#eef3f5;color:#172c39;font:16px/1.65 system-ui,sans-serif}main{max-width:760px;margin:40px auto;background:white;padding:32px;border-radius:16px}h1{font-size:28px;margin-top:0}.eyebrow{color:#136d65;font-weight:700}label{display:block;font-weight:700}input,select,textarea,button{box-sizing:border-box;display:block;width:100%;padding:12px;margin:12px 0;font:inherit;border-radius:8px;border:1px solid #bfccd1}button{background:#136d65;color:white;cursor:pointer;border:0;font-weight:700}button:disabled{opacity:.45;cursor:default}#job-summary,#workflow-status{white-space:pre-wrap;background:#f2f6f7;padding:16px;border-radius:8px}.note{font-size:14px;color:#52636e}li{margin:8px 0}@media(max-width:820px){main{margin:12px;padding:20px}}
+details{margin:20px 0;padding:16px;border:1px solid #bfccd1;border-radius:8px}summary{cursor:pointer;font-weight:700}.ack{display:flex;align-items:flex-start;gap:10px;font-weight:400}.ack input{width:20px;height:20px;flex:none;margin:4px 0}
+.result{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f6f7;padding:16px;border-radius:8px}.result:empty{display:none}
+
+button[hidden]{display:none}
+
+#final-result-note{min-height:100px;resize:vertical}#final-send{background:#294b72}pre.result{font:inherit}

@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "비전 어시스트",
+  "version": "1.0.0",
+  "description": "실적 기반 입력과 신규 자료 입력, 작업 이어하기, 업데이트를 한곳에서 관리합니다.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "debugger",
+    "nativeMessaging"
+  ],
+  "optional_host_permissions": [
+    "https://unipass.customs.go.kr/*"
+  ],
+  "action": {
+    "default_title": "비전 어시스트 열기",
+    "default_icon": "assist-icon.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+U"
+      }
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'none'"
+  },
+  "background": {
+    "service_worker": "assist-worker.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "assist-icon.png",
+    "48": "assist-icon.png",
+    "128": "assist-icon.png"
+  }
+}

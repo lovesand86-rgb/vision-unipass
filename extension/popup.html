@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>UNI-PASS 입력칸 확인</title>
+  <link rel="stylesheet" href="popup.css">
+<link rel="stylesheet" href="assist-legacy.css"></head>
+<body><nav class="assist-nav"><a href="assist.html">‹ 비전 어시스트</a><span>기존 입력 도구 · 작업 자료 유지</span></nav>
+  <h1>UNI-PASS 입력칸 확인</h1>
+  <button id="open-workflow">검색부터 신고서 입력까지</button>
+  <button id="open-cargo">열린 신고서 한 번에 입력·이어하기</button>
+  <button id="open-common">반입일·담당자 연락처 자동 준비</button>
+  <p>화면 구조 확인과 신고서 입력을 돕습니다. 통합 입력 도구의 최종 단계에서 오류검증·임시저장을 실행하며 전송은 별도 버튼으로 실행합니다.</p>
+  <label for="step">현재 화면</label>
+  <select id="step">
+    <option>공통사항</option><option>품목사항</option><option>한글표시사항정보</option>
+    <option>첨부파일</option><option>조회 목록</option><option>신청서 원문보기</option>
+    <option>화물관리번호 조회</option><option>업체·창고 조회</option>
+  </select>
+  <button id="capture">현재 화면 읽기</button>
+  <details id="remote-reader">
+    <summary>아이콘 없는 원문보기 창 읽기</summary>
+    <p>원문보기 창을 열어둔 채 일반 크롬 창에서 사용하세요. 처음 찾을 때 UNI-PASS 사이트 접근 권한을 요청합니다. 선택한 창의 구조만 읽으며 신고값을 입력하지 않습니다.</p>
+    <button id="find-original" class="secondary">열린 원문보기 찾기</button>
+    <label for="original-target">읽을 원문보기 창</label>
+    <select id="original-target"><option value="">먼저 원문보기 찾기를 누르세요</option></select>
+    <button id="capture-original" disabled>선택한 원문보기 읽기</button>
+  </details>
+  <p id="notice" role="status" aria-live="polite"></p>
+  <ul id="captures"></ul>
+  <button id="export" disabled>수집 파일 저장</button>
+  <button id="clear" class="secondary">수집 내용 지우기</button>
+  <details><summary>어떤 정보를 읽나요?</summary>
+    <p>입력칸 ID·이름·종류, 항목 이름, 버튼 문구, 화면 경로를 읽습니다. 입력값·첨부파일·쿠키·비밀번호는 읽지 않습니다. 선택목록의 내용도 제외합니다.</p>
+    <p>자동 업로드는 없습니다. 저장된 JSON을 확인한 뒤 대화에 첨부해 주세요. 항목 이름이나 버튼 문구 자체에 업무정보가 있으면 포함될 수 있습니다.</p>
+  </details>
+  <hr>
+  <details id="trial">
+    <summary>신고값 입력 시험 · 준비된 작업 파일 필요</summary>
+    <p>이번 화물 연결 후 채번 전 복사본에서만 사용합니다. 품목 입력 시험은 품목사항 탭에서 해당 품목을 먼저 선택하세요.</p>
+    <p>작업 파일에 있는 수량·중량·금액·날짜·담당자 연락처 중 해당 탭의 항목만 입력합니다. 제조공정·성분·한글표시·첨부·저장·전송은 처리하지 않습니다.</p>
+    <label for="job-file">별도로 받은 입력 작업 JSON</label>
+    <input id="job-file" type="file" accept=".json,application/json">
+    <button id="preview-fill" disabled>대상과 변경값 확인</button>
+    <div id="fill-preview"></div>
+    <button id="apply-fill" disabled>확인한 값 입력</button>
+    <p id="fill-notice" role="status" aria-live="polite"></p>
+    <p>이 단계는 현재 입력값을 읽어 위에 비교 표시합니다. 해당 값과 작업 파일은 확장 저장소나 외부로 보내지 않습니다. 창을 닫으면 작업 파일을 다시 선택해야 합니다.</p>
+  </details>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

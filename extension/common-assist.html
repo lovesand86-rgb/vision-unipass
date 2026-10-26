@@ -1,0 +1,27 @@
+<!doctype html><html lang="ko"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>비전 · 반입일과 담당자 연락처</title><link rel="stylesheet" href="workflow.css">
+<nav class="assist-nav"><a href="assist.html">‹ 비전 어시스트</a><span>기존 입력 도구 · 작업 자료 유지</span></nav><main><p class="eyebrow">비전컨설팅 · 공통사항 입력 · 0.9.0</p>
+<h1>반입일과 담당자 연락처</h1>
+<p>현재 신고서의 화물번호로 유니패스를 조회하고, 보관창고가 일치하는 반입일을 가져옵니다. 담당자 연락처는 한 번 확인해 저장하면 다음 건에서도 불러옵니다.</p>
+<button id="read-common">현재 신고서 읽기·반입일 조회</button>
+<div id="common-summary" class="result"></div>
+<p id="entry-status" role="status" aria-live="polite" class="result"></p>
+<p id="entry-result" class="result"></p>
+<section id="contact-panel" hidden>
+<h2>담당자 연락처</h2><p id="contact-notice"></p>
+<label for="contact-phone">전화번호</label><input id="contact-phone" type="tel" autocomplete="off">
+<label for="contact-mobile">휴대전화번호</label><input id="contact-mobile" type="tel" autocomplete="off">
+<button id="use-mobile">휴대전화번호를 전화번호에도 사용</button>
+<label class="ack"><input id="contact-ack" type="checkbox">이 번호가 현재 신청인의 연락처임을 확인했습니다.</label>
+<button id="save-contact" disabled>이 담당자 연락처 기억하기</button>
+<button id="forget-contact">이 담당자 저장 연락처 지우기</button>
+<p class="note">신청인 성명·이메일·신고인부호가 같은 경우에만 다시 불러옵니다. 번호는 이 크롬의 확장 저장소에 보관하며 외부로 보내지 않습니다. 화면에 번호가 없거나 틀리면 최초 한 번 수정해 주세요.</p>
+</section>
+<button id="preview-common" disabled>가져온 값 확인</button>
+<div id="common-preview" class="result"></div>
+<button id="apply-common" disabled>확인한 반입일·연락처 입력</button>
+<p id="common-status" role="status" aria-live="polite" class="result">조회 준비 중입니다.</p>
+<button id="retry-entry" hidden>반입일 다시 조회</button>
+<p class="note">공통사항 탭을 열어두세요. 입력 후 값이 유지되는지 확인합니다. 오류검증·임시저장·전송은 누르지 않습니다.</p>
+</main><script type="module" src="common-assist.js"></script></html>
