@@ -6,22 +6,30 @@ const $ = id => document.getElementById(id);
 const key = 'visionCopyAttemptV1';
 const origin = 'https://unipass.customs.go.kr/*';
 const originalPath = '/csp/csw/reqrqstmt/apfmmt/foodEtcImpDcshMtCtr/retrieveApfmOdv.do';
-let job = targets.searchTarget||null, busy = false;
+let job = targets.searchTarget||null, busy = false, starting = false;
 const canChain=()=>job&&targets.searchTarget&&targets.itemTarget&&targets.commonTarget&&
   JSON.stringify(job)===JSON.stringify(targets.searchTarget);
 let draftDiagnostics = [];
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const status = message => { $('workflow-status').textContent = message; };
+const status = message => { $('workflow-status').textContent = message; $('workflow-status').hidden=!message; };
+function showJob(){
+ const box=$('job-summary');box.replaceChildren();box.hidden=!job;
+ $('job-files').open=!job;$('job-files').querySelector('summary').textContent=job?'작업 파일 바꾸기':'작업 파일을 선택해주세요';
+ if(!job)return;
+ for(const [tag,value] of [['strong',job.identity.product_name],['span',job.identity.importer_name],['small','실적 '+job.source_application]]){const node=document.createElement(tag);node.textContent=value;box.append(node);}
+}
 const log = message => { const li = document.createElement('li'); li.textContent = message; $('workflow-log').append(li); status(message); };
 const refresh = () => {
-  $('workflow-job').disabled = busy;
-  $('find-list').disabled = busy || !job;
-  $('list-target').disabled = busy;
-  $('start-copy').disabled = busy || !job || !$('list-target').value;
-  $('check-copy').disabled = busy || !job;
-  $('closed-draft-ack').disabled = busy;
-  $('close-attempt').disabled = busy || !job || !$('closed-draft-ack').checked;
-  $('start-sequence').disabled=busy||!canChain();
+  const working=busy||starting;
+  $('workflow-job').disabled = working;
+  $('find-list').disabled = working || !job;
+  $('list-target').disabled = working;
+  $('start-copy').disabled = working || !job || !$('list-target').value;
+  $('check-copy').disabled = working || !job;
+  $('closed-draft-ack').disabled = working;
+  $('close-attempt').disabled = working || !job || !$('closed-draft-ack').checked;
+  $('start-sequence').disabled=working||!job;
+  $('start-sequence').textContent=working?'진행 중…':'시작하기';
 };
 const invoke = async (tabId, action, more = {}) => {
   let timer;
@@ -75,6 +83,7 @@ const showDraft = async (attempt, tab) => {
 $('workflow-job').addEventListener('change', async () => {
   job = null;
   $('closed-draft-ack').checked = false;
+  $('list-choice').hidden=true;
   $('list-target').replaceChildren(new Option('처리현황을 찾아주세요', ''));
   $('job-summary').textContent = '';
   try {
@@ -83,10 +92,10 @@ $('workflow-job').addEventListener('change', async () => {
     const value = JSON.parse(await file.text());
     if (value.format !== 'vision-unipass-search-copy' || value.version !== 1 || !value.identity || !value.search || !value.source_application) throw new Error('입력 시험 파일이 아닌 검색·복사 작업 파일을 선택해 주세요.');
     job = value;
-    $('job-summary').textContent = `제품: ${job.identity.product_name}\n수입화주: ${job.identity.importer_name}\n복사할 실적: ${job.source_application}\n조회 기간: ${job.search.from} ~ ${job.search.to}`;
-    status('열린 처리현황 찾기를 누르세요.');
+    showJob();
+    status('');
   } catch (error) { status(error.message); }
-  refresh();
+  showJob();refresh();
 });
 $('list-target').addEventListener('change', refresh);
 async function findLists() {
@@ -106,7 +115,8 @@ async function findLists() {
     if (found.length === 1) $('list-target').value = String(found[0].id);
     else if(found.some(t=>String(t.id)===previous))$('list-target').value=previous;
     foundOne=!!$('list-target').value;
-    status(found.length ? '검색·복사 시작 버튼을 누르세요.' : '로그인한 UNI-PASS의 신청서 처리현황을 열어둔 뒤 다시 찾아주세요.');
+    $('list-choice').hidden=found.length<2;
+    status(found.length ? (foundOne?'시작하기를 누르세요.':'진행할 화면을 선택하고 시작하기를 누르세요.') : '로그인한 UNI-PASS의 신청서 처리현황을 열어둔 뒤 다시 찾아주세요.');
   } catch (error) { status(error.message); } finally { busy = false; refresh(); }
   return foundOne;
 }
@@ -133,7 +143,7 @@ async function lockedRun(checkOnly,chain=false) {
           const existing=await checkDraft(attempt);
           if(existing){await complete(attempt,existing);return;}
         }
-        throw new Error('이전에 복사를 요청한 기록이 있습니다. 해당 작업 파일로 복사 결과만 다시 확인해 주세요. 자동 재복사는 하지 않습니다.');
+        throw new Error('이전 복사 기록이 있습니다. 해당 작업 파일로 바꾼 뒤 시작하기를 눌러 결과를 확인해주세요. 다시 복사하지 않습니다.');
       }
       const listTab = Number($('list-target').value);
       if (!Number.isInteger(listTab) || !$('list-target').value) throw new Error('처리현황 창을 선택해 주세요.');
@@ -174,7 +184,7 @@ async function lockedRun(checkOnly,chain=false) {
           await complete(attempt, draft);
         } catch (error) {
           await save({...attempt, stage: 'copy_unknown'});
-          throw new Error('복사 결과 확인이 필요합니다. ' + error.message + ' 복사 결과만 다시 확인 버튼을 이용해 주세요.\n' + draftDiagnostics.join('\n'));
+          throw new Error('복사 결과 확인이 필요합니다. ' + error.message + ' 시작하기를 눌러 결과만 다시 확인해주세요.\n' + draftDiagnostics.join('\n'));
         }
       } finally { await guard.stop(); }
     });
@@ -184,12 +194,18 @@ async function lockedRun(checkOnly,chain=false) {
   if(handoff!==null)location.assign('cargo-workflow.html?tab='+handoff+'&autorun=1');
 }
 $('start-sequence').addEventListener('click',async()=>{
-  if(busy||!canChain())return;
-  const attempt=await load();
-  if(attempt&&attempt.fingerprint===await digest()&&['copy_requested','copy_unknown','copy_verified'].includes(attempt.stage)){
-    await lockedRun(false,true);return;
-  }
-  if(await findLists())await lockedRun(false,true);
+  if(busy||starting||!job)return;
+  starting=true;refresh();
+  try{
+    // Request while the click gesture is active, before reading saved state.
+    if(!await chrome.permissions.request({origins:[origin]}))throw Error('UNI-PASS 화면 연결을 허용해주세요.');
+    const attempt=await load();
+    if(attempt&&attempt.fingerprint===await digest()&&['copy_requested','copy_unknown','copy_verified'].includes(attempt.stage)){
+      await lockedRun(true,canChain());return;
+    }
+    if(await findLists())await lockedRun(false,canChain());
+  }catch(error){status(error.message);}
+  finally{starting=false;refresh();}
 });
 $('start-copy').addEventListener('click', () => lockedRun(false));
 $('check-copy').addEventListener('click', () => lockedRun(true));
@@ -221,15 +237,12 @@ $('close-attempt').addEventListener('click', async () => {
         closedAt: new Date().toISOString(), closure: 'user_confirmed_closed_without_save_or_submit'};
       await chrome.storage.local.set({[key]: closed, visionLastClosedCopyAttemptV1: closed});
       $('closed-draft-ack').checked = false;
-      log('닫은 복사본 작업을 종료했습니다. 열린 처리현황 찾기 → 실적 검색 → 확인 → 복사본 열기 순서로 다시 시작하세요.');
+      log('닫은 작업을 정리했습니다. 시작하기를 누르세요.');
     });
   } catch (error) { log(error.message || '작업을 종료하지 못했습니다. 이전 기록을 유지합니다.'); }
   finally { busy = false; refresh(); }
 });
-if(job){
-  $('job-summary').textContent=`제품: ${job.identity.product_name}\n수입화주: ${job.identity.importer_name}\n복사할 실적: ${job.source_application}\n조회 기간: ${job.search.from} ~ ${job.search.to}`;
-  status('작업 정보가 준비됐습니다. 검색부터 한 번에 시작을 누르세요.');
-}
+showJob();
 refresh();
 
-guardToolNavigation(()=>busy);
+guardToolNavigation(()=>busy||starting);

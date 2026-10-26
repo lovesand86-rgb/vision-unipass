@@ -1,24 +1,23 @@
 <!doctype html><html lang="ko"><meta charset="utf-8">
 <title>비전 · 실적 검색과 복사</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="assist.css"><link rel="stylesheet" href="workflow.css"><link rel="stylesheet" href="assist-tool.css">
-<header class="tool-header"><a class="brand" href="assist.html" data-app-nav><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><a class="icon-button" href="assist.html?view=settings" aria-label="설정" data-app-nav><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></svg></a></header><nav class="tool-nav"><a href="assist.html?view=history" data-app-nav>‹ 실적 기반 입력</a><span>비전 어시스트 작업 공간</span></nav><main><p class="eyebrow">VISION ASSIST · 실적 기반 입력</p>
-<h1>실적 검색과 입력</h1>
-<p>UNI-PASS에 로그인하고 <strong>신청서 처리현황</strong>만 열어두세요. 제품 검색과 원문보기, 신청서 복사는 도구가 진행합니다.</p>
-<p>검색·복사 후 품목 선택·화물 연결·소비기한·수정·선적일·반입일·저장 연락처 입력을 이어갑니다. 사진 첨부까지 이어갈 수 있습니다. 한글표시는 직접 확인하고, 오류검증·임시저장·전송은 입력 도구의 별도 최종 단계에서 실행합니다.</p>
-<label for="workflow-job">검색·복사 작업 파일</label><input id="workflow-job" type="file" accept=".json,application/json">
-<div id="job-summary"></div>
-<button id="start-sequence" disabled>검색부터 한 번에 시작·이어하기</button>
-<button id="find-list" disabled>열린 처리현황 찾기</button>
-<select id="list-target"><option value="">처리현황을 찾아주세요</option></select>
-<button id="start-copy" disabled>실적 검색 → 확인 → 복사본 열기</button>
-<button id="check-copy" disabled>복사 결과만 다시 확인</button>
-<details id="closed-draft-help">
-<summary>복사본을 저장하지 않고 닫았나요?</summary>
-<p>닫은 복사본의 작업을 종료하면 같은 실적을 다시 검색·복사할 수 있습니다. 임시저장하거나 전송한 신청서는 이 기능으로 다시 만들지 마세요.</p>
-<label class="ack"><input id="closed-draft-ack" type="checkbox">복사본을 임시저장·전송하지 않고 닫았습니다.</label>
-<button id="close-attempt" disabled>닫은 복사본 작업 종료</button>
+<header class="tool-header"><a class="brand" href="assist.html" data-app-nav><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><a class="icon-button" href="assist.html?view=settings" aria-label="설정" data-app-nav><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></svg></a></header><nav class="tool-nav"><a href="assist.html?view=history" data-app-nav>‹ 실적 기반 입력</a><span>비전 어시스트 작업 공간</span></nav><main class="simple-workflow">
+<h1>실적 불러오기</h1>
+<p class="lead">UNI-PASS에 로그인하고 <strong>신청서 처리현황</strong>을 열어주세요.</p>
+<div id="job-summary" hidden></div>
+<details id="job-files"><summary>작업 파일 바꾸기</summary><label for="workflow-job" class="file-pick">작업 파일 선택</label><input id="workflow-job" class="sr-only" type="file" accept=".json,application/json"></details>
+<div id="list-choice" hidden><label for="list-target">어느 화면에서 진행할까요?</label><select id="list-target"><option value="">처리현황을 선택하세요</option></select></div>
+<button id="start-sequence" class="main-action" disabled>시작하기</button>
+<p id="workflow-status" role="status" aria-live="polite" hidden></p>
+<details id="more-tools" class="extra-tools"><summary>도움이 필요할 때</summary>
+<button id="find-list" class="secondary" disabled>UNI-PASS 화면 다시 찾기</button>
+<button id="start-copy" class="secondary" disabled>실적 복사만 하기</button>
+<button id="check-copy" class="secondary" disabled>복사 결과 확인</button>
+<details id="closed-draft-help"><summary>저장하지 않고 닫은 작업 정리</summary>
+<p>임시저장하거나 전송한 신청서에는 사용하지 마세요.</p>
+<label class="ack"><input id="closed-draft-ack" type="checkbox">임시저장·전송하지 않고 복사본을 닫았습니다.</label>
+<button id="close-attempt" class="secondary" disabled>닫은 작업 정리</button></details>
+<details><summary>자세한 안내</summary><p>시작하기는 실적을 찾아 복사합니다. 품목·화물 정보가 준비되어 있으면 입력까지 이어갑니다. 한글표시는 직접 확인하고, 검증·저장·전송은 다음 화면에서 따로 진행합니다.</p><p>복사 결과가 불확실하면 다시 복사하지 않고 결과만 확인합니다. UNI-PASS에 표시된 다른 알림은 직접 확인해주세요.</p></details>
+<details><summary>진행 기록</summary><ol id="workflow-log"></ol></details>
 </details>
-<p id="workflow-status" role="status" aria-live="polite">작업 파일을 선택하세요.</p>
-<ol id="workflow-log"></ol>
-<p class="note">확인된 한글표시사항 안내창 한 종류만 자동 확인합니다. 다른 알림은 직접 확인해 주세요. 복사 요청 이후 결과가 불명확하면 재클릭하지 않고 결과 확인만 합니다.</p>
 </main><script type="module" src="workflow.js"></script></html>

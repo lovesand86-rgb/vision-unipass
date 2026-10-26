@@ -28,8 +28,7 @@ function renderHome(){
 }
 async function history(){
  if(!ensureLeave())return;dirty=false;screen='history';
- const targets=await import('./cargo-target.js');
- main.innerHTML=head('실적 기반 입력','기존 실적을 불러와 이번 작업의 입력을 이어갑니다.')+`<section class="panel"><h2>실적 작업</h2><p class="hint">등록된 작업 정보와 담당자 연락처를 그대로 사용합니다. 로그인한 UNI-PASS 화면을 열어두세요.</p><div class="toolbar"><button class="button green" id="history-start">실적 검색부터 시작</button><button class="button" id="history-open">열린 신청서에서 이어하기</button><button class="button" id="legacy-tools">상세 도구</button></div><p class="muted">${targets.searchTarget?'기존 폴더에 보관된 작업 정보가 있습니다.':'처음 사용하는 경우 기존 작업 파일을 상세 도구에서 선택할 수 있습니다.'}</p></section><section class="panel"><h2>이번 건의 자료를 따로 정리하려면</h2><p class="hint">새 작업으로 수량·금액·날짜 등 변경할 내용을 저장하고, 실제 입력칸과 연결해 사용할 수 있습니다.</p><button class="button" id="history-data">입력 자료 정리</button></section>`;
+ main.innerHTML=head('실적 기반 입력','어떤 작업을 할까요?')+`<div class="start-choices"><button id="history-start" class="start-choice primary"><span class="choice-icon">＋</span><strong>새로 시작</strong><small>이전 실적을 불러와 입력</small><span class="choice-arrow">→</span></button><button id="history-open" class="start-choice"><span class="choice-icon">↪</span><strong>이어서 입력</strong><small>열어둔 신청서에서 계속</small><span class="choice-arrow">→</span></button></div><details class="extra-tools"><summary>다른 작업</summary><div class="toolbar"><button class="button" id="history-data">입력 자료 정리</button><button class="button" id="legacy-tools">상세 도구</button></div></details>`;
  bindBack();on('history-start',()=>openTool('workflow.html'));on('history-open',async()=>{const id=await pickTab();if(id)await openTool('cargo-workflow.html?tab='+id);});on('legacy-tools',()=>openTool('popup.html'));on('history-data',()=>{job=newJob('history');editor();});
 }
 async function jobs(){
