@@ -1,0 +1,11 @@
+/* Shared application chrome for the existing workflow screens. */
+body{width:auto;min-width:340px;padding:0;margin:0;background:#f5f6f2;color:#24372f;font:14px/1.8 'Malgun Gothic',system-ui,sans-serif;display:block}
+.tool-header{max-width:1050px;margin:auto;height:105px;padding:28px 40px;box-sizing:border-box}
+.tool-header a{margin:0;text-decoration:none}.tool-header .icon-button{font-size:25px;width:40px;height:40px;padding:0;background:transparent;color:#65736a;border:0}
+.tool-nav{max-width:970px;margin:0 auto 18px;display:flex;justify-content:space-between;gap:14px;font-size:12px;color:#84927e;padding:0 2px}.tool-nav a{color:#687b6b;text-decoration:none}
+main{box-sizing:border-box;width:calc(100% - 80px);max-width:970px;margin:0 auto 32px;padding:28px;background:#fffefa;border:1px solid #dce3da;border-radius:20px;overflow-wrap:anywhere}
+h1{font-size:25px;letter-spacing:-1px;margin:8px 0 20px}.eyebrow{font-size:10px;color:#7e9484;letter-spacing:2px}
+input,select,textarea{max-width:100%;box-sizing:border-box}button{font-size:13px;border-radius:10px;background:#326c50;padding:12px;color:white}button.secondary{background:#edf2e9;color:#3e5843}
+#job-summary,#workflow-status,.result{background:#edf2e8;color:#4c654b;border-radius:10px;font-size:13px}#notice{white-space:pre-wrap}.note{font-size:12px;color:#748074}details{border-color:#dce3da}
+.tool-dialog-actions{display:flex;gap:12px}.tool-dialog-actions button{width:auto;flex:1}dialog select{width:100%}
+@media(max-width:1050px){.tool-nav{margin-left:40px;margin-right:40px}}@media(max-width:650px){.tool-header{height:86px;padding:20px 22px}.tool-nav{margin-left:22px;margin-right:22px}.tool-nav span{display:none}main{width:calc(100% - 40px);padding:18px}h1{font-size:22px}}

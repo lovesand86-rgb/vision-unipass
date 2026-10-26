@@ -1,3 +1,4 @@
+import {guardToolNavigation} from './assist-navigation.js';
 import {readCommonData} from './common-data.js';
 import {fillDraftFields} from './fill.js';
 const $ = id => document.getElementById(id);
@@ -137,3 +138,5 @@ $('apply-common').addEventListener('click', () => run(async () => {
 }));
 refresh();
 run(read);
+
+guardToolNavigation(()=>busy);

@@ -1,3 +1,4 @@
+import {guardToolNavigation} from './assist-navigation.js';
 import {watchLabelNotice} from './label-notice.js';
 import {declarationStep} from './search-copy.js';
 import * as targets from './cargo-target.js';
@@ -230,3 +231,5 @@ if(job){
   status('작업 정보가 준비됐습니다. 검색부터 한 번에 시작을 누르세요.');
 }
 refresh();
+
+guardToolNavigation(()=>busy);

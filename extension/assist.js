@@ -1,3 +1,4 @@
+import {openTool} from './assist-navigation.js';
 import {VERSION,emptyState,newJob,validateJob,parseRows,readImport,cleanExport} from './assist-model.js';
 import {assistFill} from './assist-fill.js';
 const $=id=>document.getElementById(id), main=$('main');
@@ -28,10 +29,9 @@ function renderHome(){
 async function history(){
  if(!ensureLeave())return;dirty=false;screen='history';
  const targets=await import('./cargo-target.js');
- main.innerHTML=head('실적 기반 입력','기존 실적을 불러와 이번 작업의 입력을 이어갑니다.')+`<section class="panel"><h2>기존 입력 도구</h2><p class="hint">등록된 작업 정보와 담당자 연락처를 그대로 사용합니다. 로그인한 UNI-PASS 화면을 열어두세요.</p><div class="toolbar"><button class="button green" id="history-start">실적 검색부터 시작</button><button class="button" id="history-open">열린 신청서에서 이어하기</button><button class="button" id="legacy-tools">기존 상세 도구</button></div><p class="muted">${targets.searchTarget?'기존 폴더에 보관된 작업 정보가 있습니다.':'처음 사용하는 경우 기존 작업 파일을 상세 도구에서 선택할 수 있습니다.'}</p></section><section class="panel"><h2>이번 건의 자료를 따로 정리하려면</h2><p class="hint">새 작업으로 수량·금액·날짜 등 변경할 내용을 저장하고, 실제 입력칸과 연결해 사용할 수 있습니다.</p><button class="button" id="history-data">입력 자료 정리</button></section>`;
+ main.innerHTML=head('실적 기반 입력','기존 실적을 불러와 이번 작업의 입력을 이어갑니다.')+`<section class="panel"><h2>실적 작업</h2><p class="hint">등록된 작업 정보와 담당자 연락처를 그대로 사용합니다. 로그인한 UNI-PASS 화면을 열어두세요.</p><div class="toolbar"><button class="button green" id="history-start">실적 검색부터 시작</button><button class="button" id="history-open">열린 신청서에서 이어하기</button><button class="button" id="legacy-tools">상세 도구</button></div><p class="muted">${targets.searchTarget?'기존 폴더에 보관된 작업 정보가 있습니다.':'처음 사용하는 경우 기존 작업 파일을 상세 도구에서 선택할 수 있습니다.'}</p></section><section class="panel"><h2>이번 건의 자료를 따로 정리하려면</h2><p class="hint">새 작업으로 수량·금액·날짜 등 변경할 내용을 저장하고, 실제 입력칸과 연결해 사용할 수 있습니다.</p><button class="button" id="history-data">입력 자료 정리</button></section>`;
  bindBack();on('history-start',()=>openTool('workflow.html'));on('history-open',async()=>{const id=await pickTab();if(id)await openTool('cargo-workflow.html?tab='+id);});on('legacy-tools',()=>openTool('popup.html'));on('history-data',()=>{job=newJob('history');editor();});
 }
-async function openTool(path){if(!extension)throw Error('설치된 프로그램에서 사용할 수 있습니다.');await chrome.tabs.create({url:chrome.runtime.getURL(path)});}
 async function jobs(){
  if(!ensureLeave())return;dirty=false;screen='jobs';state=await rpc({type:'read'});
  main.innerHTML=head('작업 이어하기','저장한 자료와 입력 기록을 이어서 확인합니다.')+`<section class="panel"><div class="toolbar"><button class="button" id="import-job">작업 가져오기</button><button class="button" id="legacy-resume">기존 입력 작업 이어하기</button></div><div id="jobs-list">${state.jobs.length?state.jobs.map(j=>`<div class="job-row"><div><strong>${esc(j.title)}</strong><span class="badge">${j.kind==='new'?'신규 자료':'실적 자료'}</span><small>${new Date(j.updatedAt).toLocaleString('ko-KR')} · ${j.fields.length}항목 · ${j.attempts?.some(a=>a.result==='pending')?'입력 결과 확인 필요':'저장됨'}</small></div><button class="button small" data-job="${esc(j.id)}">열기</button></div>`).join(''):'<p class="empty">아직 저장한 작업이 없습니다.<br><br>신규 자료 입력에서 첫 작업을 만들어보세요.</p>'}</div></section>`;
@@ -102,7 +102,7 @@ async function updates(){
  if(!ensureLeave())return;dirty=false;screen='updates';
  main.innerHTML=head('업데이트 확인','ZIP을 다시 내려받지 않고, 여기서 새 기능을 받으세요.')+`<section class="panel update-center"><div class="update-mark">${icon('update')}</div><h2>비전 어시스트</h2><p>현재 버전 ${VERSION}</p><div class="toolbar" style="justify-content:center"><button class="button green" id="check-update">새 버전 확인</button><button class="button" id="restore-update">이전 버전 복구</button></div><div id="update-status" class="status">새 버전을 확인하면 배포된 업데이트가 있는지 안내합니다.</div><div id="update-action" class="button-row"></div></section>`;
  bindBack();on('check-update',checkUpdate);on('restore-update',async()=>{
-  if(!confirm('입력 도구 탭을 닫았나요? 마지막 업데이트 이전 파일로 복구합니다. 저장한 작업 자료는 유지됩니다.'))return;
+  if(!confirm('작업 화면을 종료했나요? 마지막 업데이트 이전 파일로 복구합니다. 저장한 작업 자료는 유지됩니다.'))return;
   await nativeAction('restore');
  });
 }
@@ -111,7 +111,7 @@ async function checkUpdate(){
  $('check-update').disabled=true;$('update-status').textContent='새 버전을 확인하고 있습니다.';
  try{
   const r=await native('check');nativeStatus=r;
-  $('update-status').textContent=r.available?`새 버전 ${r.version}을 사용할 수 있습니다.\n입력 도구 탭을 닫은 뒤 업데이트하세요. UNI-PASS 화면과 저장 자료는 유지합니다.`:r.message||'현재 최신 버전입니다.';
+  $('update-status').textContent=r.available?`새 버전 ${r.version}을 사용할 수 있습니다.\n다른 비전 작업 창을 닫은 뒤 업데이트하세요. UNI-PASS 화면과 저장 자료는 유지합니다.`:r.message||'현재 최신 버전입니다.';
   $('update-status').className='status';$('update-action').innerHTML=r.available?'<button class="button green" id="install-update">업데이트 설치</button>':'';
   on('install-update',()=>nativeAction('apply'));
  }catch(e){$('update-status').className='status warning';$('update-status').textContent=e.message;}
@@ -123,7 +123,7 @@ async function nativeAction(command){
  catch(e){$('update-status').className='status error';$('update-status').textContent=e.message;}
 }
 async function settings(){
- modal(`<h2>설정</h2><div class="setting-row"><div><strong>실행 시 업데이트 확인</strong><p>새 버전이 있으면 알려줍니다. 설치는 직접 선택합니다.</p></div><input type="checkbox" id="auto-check" aria-label="실행 시 업데이트 확인" ${state.settings.checkOnOpen?'checked':''}></div><div class="setting-row"><div><strong>작업 백업</strong><p>저장한 자료를 파일로 보관합니다.</p></div><button class="button small" id="backup">내보내기</button></div><div class="setting-row"><div><strong>작업 백업 복원</strong><p>기존 작업을 유지하고 새 작업으로 가져옵니다.</p></div><button class="button small" id="restore-data">가져오기</button></div><p class="hint">자료는 현재 Chrome 프로필에 저장됩니다. 확장을 삭제하면 자료가 지워질 수 있으니 백업을 보관해주세요.</p><p class="muted">비전 어시스트 ${VERSION} · <a href="assist-licenses.html" target="_blank" rel="noopener">프로그램 정보·라이선스</a></p>`);
+ modal(`<h2>설정</h2><div class="setting-row"><div><strong>실행 시 업데이트 확인</strong><p>새 버전이 있으면 알려줍니다. 설치는 직접 선택합니다.</p></div><input type="checkbox" id="auto-check" aria-label="실행 시 업데이트 확인" ${state.settings.checkOnOpen?'checked':''}></div><div class="setting-row"><div><strong>작업 백업</strong><p>저장한 자료를 파일로 보관합니다.</p></div><button class="button small" id="backup">내보내기</button></div><div class="setting-row"><div><strong>작업 백업 복원</strong><p>기존 작업을 유지하고 새 작업으로 가져옵니다.</p></div><button class="button small" id="restore-data">가져오기</button></div><p class="hint">자료는 현재 Chrome 프로필에 저장됩니다. 확장을 삭제하면 자료가 지워질 수 있으니 백업을 보관해주세요.</p><p class="muted">비전 어시스트 ${VERSION} · <a href="assist-licenses.html">프로그램 정보·라이선스</a></p>`);
  on('auto-check',async e=>{state.settings.checkOnOpen=e.target.checked;await write();},'change');on('backup',()=>download(JSON.stringify({format:'vision-assist-backup',schema:1,jobs:state.jobs},null,2),'비전-작업백업.json'));
  on('restore-data',()=>chooseFile(async text=>{if(text.length>7500000)throw Error('백업 파일이 너무 큽니다.');const data=JSON.parse(text);if(data.format!=='vision-assist-backup'||data.schema!==1||!Array.isArray(data.jobs)||data.jobs.length>500)throw Error('지원하는 백업 파일이 아닙니다.');const added=data.jobs.map(j=>readImport(JSON.stringify({format:'vision-assist-job',schema:1,job:j})));state.jobs.push(...added);await write();$('dialog').close();toast(`${added.length}개 작업을 가져왔습니다. 입력 전 원문을 다시 확인해주세요.`);}));
 }
@@ -132,4 +132,4 @@ function chooseFile(handler){const input=$('import-file');input.value='';input.o
 function download(text,name){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
 on('brand',async e=>{e.preventDefault();await home();});on('settings',settings);
 window.addEventListener('beforeunload',e=>{if(dirty||busy){e.preventDefault();e.returnValue='';}});
-try{state=await rpc({type:'read'});renderHome();if(state.settings.checkOnOpen&&extension){native('check').then(r=>{if(r.available)toast(`새 버전 ${r.version}이 있습니다. 업데이트 확인에서 설치할 수 있습니다.`);}).catch(()=>{});}}catch(e){main.textContent='자료를 불러오지 못했습니다. 창을 다시 열어주세요. '+e.message;}
+try{state=await rpc({type:'read'});renderHome();const route=new URL(location.href).searchParams.get('view');if(route==='history')await history();if(route==='settings')await settings();if(state.settings.checkOnOpen&&extension){native('check').then(r=>{if(r.available)toast(`새 버전 ${r.version}이 있습니다. 업데이트 확인에서 설치할 수 있습니다.`);}).catch(()=>{});}}catch(e){main.textContent='자료를 불러오지 못했습니다. 창을 다시 열어주세요. '+e.message;}

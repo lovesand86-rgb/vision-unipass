@@ -9,3 +9,4 @@ node_modules/
 dist/
 artifacts/update.json
 artifacts/vision-extension-core.zip
+artifacts/screenshots/

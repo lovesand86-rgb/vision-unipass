@@ -1,15 +1,21 @@
-# 비전 어시스트 1.0.0
+# 비전 어시스트 1.0.1
 
-Windows 실행기 하나로 기존 Chrome 확장 기능과 새로운 자료 입력 화면을 여는 프로그램입니다. 기존 0.9.0의 입력 모듈 21개를 그대로 보존했습니다. 현재 버전은 Windows x64용 검토 후보이며, 실제 PC의 최초 연결 및 실제 UNI-PASS 입력 확인이 남아 있습니다.
+Windows 실행기 하나로 기존 Chrome 확장 기능과 새로운 자료 입력 화면을 여는 프로그램입니다. 기존 0.9.0의 입력 흐름을 유지하면서 작업 화면과 이동을 앱 안으로 통합했습니다. 현재 버전은 Windows x64용 검토 후보이며, 실제 PC의 최초 연결 및 실제 UNI-PASS 입력 확인이 남아 있습니다.
 
 ## 사용
 
 1. `비전 어시스트.exe`를 처음 한 번 실행합니다. Python·Node·.NET 별도 설치가 필요하지 않습니다. Google Chrome은 필요합니다.
-2. 기존 확장이 발견되면 해당 폴더와 Chrome 프로필을 선택합니다. 원래 등록 경로와 `cargo-target.js`, Chrome 확장 저장소를 유지합니다. 비전 도구 탭만 닫고 UNI-PASS 신청서 탭은 유지합니다.
+2. 기존 확장이 발견되면 해당 폴더와 Chrome 프로필을 선택합니다. 원래 등록 경로와 `cargo-target.js`, Chrome 확장 저장소를 유지합니다. 업데이트 전에는 별도로 열어둔 비전 도구 탭을 닫고 UNI-PASS 신청서 탭은 유지합니다.
 3. 최초 연결 화면의 안내대로 확장 새로고침 및 새 권한 확인을 한 번 진행합니다. 새로 설치하는 경우 Chrome에서 개발자 모드와 ‘압축해제된 확장 프로그램을 로드합니다’가 처음 한 번 필요합니다.
 4. 이후 바탕화면의 **비전 어시스트**를 더블클릭합니다. 실행기는 로그인된 기존 Chrome 프로필에서 독립 앱 창을 엽니다.
 
 프로그램은 `%LOCALAPPDATA%\VisionAssist`에 실행기·연결 설정·업데이트 백업을 보관합니다. 기존 확장의 파일 경로는 이동하지 않습니다. Windows 전체 설정 또는 관리자 영역을 변경하지 않으며 현재 사용자에 한해 Native Messaging 연결을 등록합니다. 자동 시작/상주 서비스는 설치하지 않습니다.
+
+## 1.0.1 작업 화면 통합
+
+실적 검색·품목/화물·공통사항·상세 도구는 같은 앱 창에서 이동합니다. Chrome에는 실제 UNI-PASS 화면을 열어둡니다. 앱에서 여러 UNI-PASS 화면 중 대상을 고를 수 있으며, 상세 입력의 적용 대상은 미리보기 때 선택한 탭으로 고정합니다. 작업 실행 중에는 메뉴 이동을 막고, 파일이나 입력 변경이 있으면 이동 전에 확인합니다. 화면의 파일 선택과 임시 입력은 이동 후 다시 준비해야 할 수 있습니다.
+
+기존 사용자는 앱의 업데이트 확인에서 설치하면 되며 실행기를 다시 받을 필요는 없습니다.
 
 ## 네 가지 메뉴
 
@@ -40,6 +46,7 @@ Windows 실행기 하나로 기존 Chrome 확장 기능과 새로운 자료 입�
 ```sh
 node --test --test-isolation=none tests/model.test.mjs
 VISION_TEST_BROWSER=/path/to/chrome-for-testing node tests/browser.mjs
+node tests/navigation.mjs
 dotnet run --project tests/CoreTests.csproj
 python tools/package.py
 dotnet publish host/VisionAssist.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/windows
@@ -54,7 +61,9 @@ Node UI 테스트에는 Playwright와 Chrome for Testing을 사용합니다. 테
 - 데이터 모델 5개 테스트 통과
 - .NET 업데이트/복구 18개 검사 통과
 - 실제 Chrome 확장 로드 및 14개 UI/합성 입력 검증 통과, pageerror 0
-- 기존 자동화 JavaScript 21개 원본과 일치
+- 실제 입력·검증 모듈 유지, 화면 이동과 대상 선택을 위한 컨트롤러 수정
 - Windows x64 단일 EXE 크로스 빌드 성공
 
 실제 Windows 설치·Native Messaging·앱 창 열기·자동 재로드, 회사 Chrome 프로필 및 실제 UNI-PASS 페이지의 입력/저장/전송은 이 Linux 환경에서 검증하지 않았습니다. 실제 정부 전송은 수행하지 않았습니다. 실행 파일은 Authenticode 서명되지 않은 검토 후보입니다.
+
+통합 이동 검사는 Chrome 확장의 같은 탭 ID 유지, 신규 도구 탭 없음, 대상 선택/취소, 작업 중 이동 차단, 좁은 화면을 확인합니다. 선택 검사에서만 임시 확장 복사본의 사이트 권한을 미리 부여하며 모든 UNI-PASS 요청을 합성 HTML로 가로챕니다.

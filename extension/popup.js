@@ -1,25 +1,22 @@
+import {openTool,chooseUnipassTab,guardToolNavigation} from './assist-navigation.js';
 import {collectFormStructure} from './collect.js';
 import {fillDraftFields} from './fill.js';
 
 const $ = id => document.getElementById(id);
 const key = 'visionFormMapsV1';
-$('open-workflow').addEventListener('click', () => chrome.tabs.create({url: chrome.runtime.getURL('workflow.html')}));
+$('open-workflow').addEventListener('click', () => openTool('workflow.html'));
 $('open-cargo').addEventListener('click', async () => {
   try {
-    const granted = await chrome.permissions.request({origins: ['https://unipass.customs.go.kr/*']});
-    if (!granted) throw new Error('UNI-PASS 접근 권한이 필요합니다.');
-    const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
+    const tab = await chooseUnipassTab(); if(!tab)return;
     if (!tab?.id || !tab.url?.startsWith('https://unipass.customs.go.kr/csp/')) throw new Error('복사된 신고서 탭에서 열어 주세요.');
-    await chrome.tabs.create({url:chrome.runtime.getURL('cargo-workflow.html')+'?tab='+tab.id});
+    openTool('cargo-workflow.html?tab='+tab.id);
   } catch(error) { $('notice').textContent=error.message; }
 });
 $('open-common').addEventListener('click', async () => {
   try {
-    const granted = await chrome.permissions.request({origins: ['https://unipass.customs.go.kr/*']});
-    if (!granted) throw new Error('현재 UNI-PASS 신고서를 읽을 권한이 필요합니다.');
-    const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+    const tab = await chooseUnipassTab(); if(!tab)return;
     if (!tab?.id || !tab.url?.startsWith('https://unipass.customs.go.kr/csp/')) throw new Error('신고서 공통사항 탭에서 열어 주세요.');
-    await chrome.tabs.create({url: chrome.runtime.getURL('common-assist.html') + '?tab=' + tab.id});
+    openTool('common-assist.html?tab='+tab.id);
   } catch (error) { $('notice').textContent = error.message; }
 });
 const read = async () => (await chrome.storage.local.get(key))[key] || [];
@@ -56,10 +53,11 @@ async function captureScreen(originalTabId = null) {
   $('capture').disabled = true;
   $('notice').textContent = '현재 화면 구조를 읽는 중입니다.';
   try {
-    await refresh();
     const tab = originalTabId === null
-      ? (await chrome.tabs.query({active: true, currentWindow: true}))[0]
+      ? await chooseUnipassTab()
       : await chrome.tabs.get(originalTabId);
+    if(!tab)return;
+    await refresh();
     if (originalTabId !== null && !isOriginal(tab)) throw new Error('선택한 원문보기 창이 닫혔거나 다른 화면으로 바뀌었습니다. 다시 찾아주세요.');
     if (!tab?.id || !tab.url) throw new Error('현재 탭을 확인하지 못했습니다. UNI-PASS에서 확장 도구를 다시 여세요.');
     const url = new URL(tab.url);
@@ -201,7 +199,7 @@ async function runFill(mode) {
   $('apply-fill').disabled = true;
   $('job-file').disabled = true;
   try {
-    const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+    const tab = mode === 'apply' ? await chrome.tabs.get(fillTab) : await chooseUnipassTab(); if(!tab)return;
     if (!tab?.id || !tab.url) throw new Error('현재 신고 탭을 찾지 못했습니다.');
     const url = new URL(tab.url);
     if (url.protocol !== 'https:' || url.hostname !== 'unipass.customs.go.kr' || !url.pathname.startsWith('/csp/')) {
@@ -242,3 +240,5 @@ async function runFill(mode) {
 }
 $('preview-fill').addEventListener('click', () => runFill('preview'));
 $('apply-fill').addEventListener('click', () => runFill('apply'));
+
+guardToolNavigation(()=>busy||fillBusy);

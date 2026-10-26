@@ -1,3 +1,4 @@
+import {guardToolNavigation} from './assist-navigation.js';
 import {cargoStep} from './cargo-step.js';
 import * as targets from './cargo-target.js';
 import {itemCommitStep} from './item-commit.js';
@@ -316,3 +317,5 @@ if(new URL(location.href).searchParams.get('autorun')==='1'){
   history.replaceState(null,'',location.pathname+'?tab='+target);
   run();
 }
+
+guardToolNavigation(()=>busy);
