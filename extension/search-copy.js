@@ -23,7 +23,7 @@ export async function declarationStep(request) {
     ...[...table.querySelectorAll('td input[readonly]')].filter(input => input.type === 'text').map(input => input.value)
   ];
   const click = (id, label) => {
-    const button = one(id);
+    const button = ['btnQry','btnApfmOdv'].includes(id)?listControl(id):one(id);
     if (!visible(button) || button.matches(':disabled') || norm(text(button)) !== norm(label)) fail('버튼을 확인할 수 없습니다: ' + label);
     button.click();
   };
@@ -33,15 +33,38 @@ export async function declarationStep(request) {
   for (const key of ['product_name', 'importer_name', 'importer_id', 'manufacturer_name', 'manufacturer_id']) {
     if (typeof job.identity[key] !== 'string' || !job.identity[key].trim()) fail('대상 식별정보가 부족합니다: ' + key);
   }
-  const isList = () => location.pathname === '/csp/index.do' && visible(document.getElementById('btnQry')) && visible(document.getElementById('prnm')) && !!document.getElementById('qryTbl1');
-  if (request.action === 'probe') return {list: isList()};
+  // Hidden templates can retain the same IDs as the active search screen.
+  // Only one visible control is acceptable; never guess between active screens.
+  const listControl = id => {
+    const nodes=[...document.querySelectorAll('#'+CSS.escape(id))];
+    const shown=nodes.filter(visible);
+    if(shown.length===1)return shown[0];
+    if(!shown.length&&nodes.length===1)return nodes[0]; // account scope may be hidden
+    const names={reqApreIttCd:'기관',reqApfmCd:'서식'};
+    fail(`처리현황 조회 조건을 확인할 수 없습니다 (${names[id]||id}). 신청서 처리현황을 다시 열어주세요.`);
+  };
+  const isList = () => {
+    if(location.pathname!=='/csp/index.do')return false;
+    const button=listControl('btnQry'), product=listControl('prnm'), table=listControl('qryTbl1');
+    if(!visible(button)||!visible(product)||!visible(table))return false;
+    for(const id of ['reqApreIttCd','reqApfmCd']){
+      const node=listControl(id);
+      if(!(node instanceof HTMLSelectElement)||!visible(node)||(id==='reqApreIttCd'&&node.disabled))fail('처리현황 조회 조건이 아직 준비되지 않았습니다. 조회 조건을 펼친 뒤 다시 시작해주세요.');
+    }
+    return true;
+  };
+  if(request.action==='probe'){
+    const candidate=location.pathname==='/csp/index.do'&&document.getElementById('btnQry')&&document.getElementById('qryTbl1');
+    if(!candidate)return {list:false};
+    try{return {list:isList()};}catch(error){return {list:false,reason:error.message};}
+  }
   if (request.action === 'draft_presence') {
     // Recovery is read-only and deliberately ignores identity: an open form
     // must be reviewed even when it no longer matches this job.
     return {status: document.getElementById('CSW0101001S_reqRqstNo3') ? 'draft_present' : 'no_draft'};
   }
   const setter = (id, value) => {
-    const node = one(id);
+    const node = listControl(id);
     if (!(node instanceof HTMLInputElement) || node.type !== 'text' || !visible(node) || node.readOnly || node.matches(':disabled')) fail('검색 조건을 입력할 수 없습니다: ' + id);
     if (typeof value !== 'string' || (node.maxLength >= 0 && value.length > node.maxLength)) fail('검색 조건 길이를 확인해 주세요.');
     if (node.value !== value) {
@@ -52,12 +75,12 @@ export async function declarationStep(request) {
     if (node.value !== value) fail('검색 조건이 유지되지 않습니다: ' + id);
   };
   const selected = id => {
-    const node = one(id);
+    const node = listControl(id);
     if (!(node instanceof HTMLSelectElement)) fail('선택 필드가 아닙니다: ' + id);
     return norm(node.selectedOptions[0]?.textContent || '');
   };
   const selectLabel = (id, label) => {
-    const node = one(id);
+    const node = listControl(id);
     if (!(node instanceof HTMLSelectElement) || !visible(node) || node.matches(':disabled')) fail('검색 분류를 선택할 수 없습니다: ' + id);
     const matches = [...node.options].filter(option => norm(option.textContent) === norm(label) && !option.disabled);
     if (matches.length !== 1) fail('검색 분류 항목을 확인해 주세요: ' + label);
@@ -67,7 +90,7 @@ export async function declarationStep(request) {
     }
   };
   const filters = () => ['qryStrtDt', 'qryEndDt', 'prnm', 'owrEntsConm', 'reqRqstNo', 'reqRqstAcapNo', 'reqIttApreNo', 'prlstCdCn', 'blNoCn', 'cargMtNo', 'ovrsEntsConm', 'reqApreIttCd', 'reqApfmCd', 'reqRqstPrcsSttsClsfCd', 'aplcUserId', 'reqUserId', 'dcerSgn'].map(id => {
-    const value = one(id).value;
+    const value = listControl(id).value;
     // Date widgets can remove hyphens on submit without changing the date.
     return [id, ['qryStrtDt', 'qryEndDt'].includes(id) && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.replace(/-/g, '') : value];
   });
@@ -79,26 +102,26 @@ export async function declarationStep(request) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value) fail('검색 기간 형식을 확인해 주세요.');
     }
     if (job.search.from > job.search.to) fail('검색 시작일이 종료일보다 늦습니다.');
-    if (one('excelCheck').checked) fail('신청번호 엑셀조회 선택을 해제해 주세요.');
+    if (listControl('excelCheck').checked) fail('신청번호 엑셀조회 선택을 해제해 주세요.');
     selectLabel('reqApreIttCd', '식품의약품안전처');
     const start = Date.now();
     while (Date.now() - start < 4000) {
-      const options = [...one('reqApfmCd').options];
+      const options = [...listControl('reqApfmCd').options];
       if (options.some(option => norm(option.textContent) === norm('수입식품등의수입신고서'))) break;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     selectLabel('reqApfmCd', '수입식품등의수입신고서');
     // Keep account scope, but do not silently search under other narrowing filters.
-    for (const id of ['aplcUserId', 'reqRqstPrcsSttsClsfCd']) if (one(id).value.trim()) fail('추가 검색 조건을 비워 주세요: ' + id);
+    for (const id of ['aplcUserId', 'reqRqstPrcsSttsClsfCd']) if (listControl(id).value.trim()) fail('추가 검색 조건을 비워 주세요: ' + id);
     for (const id of ['reqRqstNo', 'reqRqstAcapNo', 'reqIttApreNo', 'prlstCdCn', 'blNoCn', 'cargMtNo', 'ovrsEntsConm']) setter(id, '');
     setter('qryStrtDt', job.search.from); setter('qryEndDt', job.search.to);
     setter('prnm', job.search.product_term); setter('owrEntsConm', job.search.importer_term);
     const state = {token: request.token, filters: JSON.stringify(filters()), changed: false, lastChange: 0};
     window.__visionSearchObserver?.disconnect();
     window.__visionSearchState = state;
-    let observedTable = one('qryTbl1');
+    let observedTable = listControl('qryTbl1');
     const observer = new MutationObserver(records => {
-      const currentTable = document.getElementById('qryTbl1');
+      let currentTable;try{currentTable=listControl('qryTbl1');}catch{currentTable=null;}
       const replaced = currentTable !== observedTable;
       if (replaced || records.some(record => observedTable?.contains(record.target))) {
         state.changed = true; state.lastChange = Date.now();
@@ -124,7 +147,7 @@ export async function declarationStep(request) {
     }
     if (!state.changed || Date.now() - state.lastChange < 600) return null;
     if (selected('reqApreIttCd') !== norm('식품의약품안전처') || selected('reqApfmCd') !== norm('수입식품등의수입신고서')) fail('조회 서식이 다릅니다.');
-    const table = one('qryTbl1');
+    const table = listControl('qryTbl1');
     const checks = [...table.querySelectorAll('input[type=checkbox][name=check]')];
     const matches = [];
     for (const check of checks) {
@@ -152,7 +175,7 @@ export async function declarationStep(request) {
     if (!record) return {status: 'waiting_for_results'};
     if (request.action === 'result') return {status: 'matched', signature: record.signature};
     if (record.signature !== request.signature) fail('검토 이후 실적 목록이 바뀌었습니다.');
-    for (const box of one('qryTbl1').querySelectorAll('input[type=checkbox][name=check]')) {
+    for (const box of listControl('qryTbl1').querySelectorAll('input[type=checkbox][name=check]')) {
       const wanted = box === record.check;
       if (box.checked !== wanted) box.click();
       if (box.checked !== wanted) fail('실적 선택을 확인할 수 없습니다.');

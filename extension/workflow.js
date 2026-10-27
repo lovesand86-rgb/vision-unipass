@@ -55,6 +55,20 @@ const poll = async (fn, timeout = 20000) => {
   while (Date.now() < until) { const result = await fn(); if (result) return result; await delay(350); }
   throw new Error('화면 전환을 확인하지 못했습니다. UNI-PASS 알림창·팝업 차단·현재 화면을 확인해 주세요.');
 };
+// Tabs can be returned without a readable URL while a popup is navigating.
+const findOriginal = async () => {
+  const found=[];
+  for(const tab of await tabs()){
+    try{
+      const url=new URL(tab.url);
+      if(url.origin!=='https://unipass.customs.go.kr'||url.pathname!==originalPath)continue;
+      const result=await invoke(tab.id,'original');
+      if(result.status==='original_matched')found.push({tab,result});
+    }catch{/* Unreadable, loading or nonmatching tabs are not an execution target. */}
+  }
+  if(found.length>1)throw Error('같은 실적 원문이 여러 개 열려 있습니다. 하나만 남기고 시작하기를 눌러주세요. 아직 복사하지 않았습니다.');
+  return found[0]||null;
+};
 const checkDraft = async attempt => {
   const allTabs = await tabs();
   const candidates = allTabs.filter(tab => [attempt.listTab, attempt.originalTab].includes(tab.id) || !attempt.beforeCopyTabs.includes(tab.id));
@@ -105,9 +119,9 @@ async function findLists() {
     const granted = await chrome.permissions.request({origins: [origin]});
     refresh();
     if (!granted) throw new Error('UNI-PASS 사이트 접근 권한이 필요합니다.');
-    const found = [];
+    const found = [], issues=[];
     for (const tab of await tabs()) {
-      try { if ((await invoke(tab.id, 'probe')).list) found.push(tab); } catch { /* Only known list screens. */ }
+      try { const result=await invoke(tab.id,'probe');if(result.list)found.push(tab);else if(result.reason)issues.push(result.reason); } catch { /* Only known list screens. */ }
     }
     const previous=$('list-target').value;
     $('list-target').replaceChildren(new Option('처리현황 창을 선택하세요', ''));
@@ -116,14 +130,14 @@ async function findLists() {
     else if(found.some(t=>String(t.id)===previous))$('list-target').value=previous;
     foundOne=!!$('list-target').value;
     $('list-choice').hidden=found.length<2;
-    status(found.length ? (foundOne?'시작하기를 누르세요.':'진행할 화면을 선택하고 시작하기를 누르세요.') : '로그인한 UNI-PASS의 신청서 처리현황을 열어둔 뒤 다시 찾아주세요.');
+    status(found.length ? (foundOne?'시작하기를 누르세요.':'진행할 화면을 선택하고 시작하기를 누르세요.') : issues[0]||'UNI-PASS에서 신청서 처리현황을 열고 시작하기를 눌러주세요.');
   } catch (error) { status(error.message); } finally { busy = false; refresh(); }
   return foundOne;
 }
 $('find-list').addEventListener('click',findLists);
-async function lockedRun(checkOnly,chain=false) {
+async function lockedRun(checkOnly,chain=false,resumeOnly=false) {
   if (busy || !job) return;
-  let handoff=null;
+  let handoff=null, needsList=false;
   const complete=async(attempt,tab)=>{await showDraft(attempt,tab);if(chain&&canChain())handoff=tab.id;};
   busy = true; refresh();
   status(checkOnly ? '열린 복사본을 다시 확인합니다.' : '이전 작업 기록과 실행 대상을 확인합니다.');
@@ -133,7 +147,7 @@ async function lockedRun(checkOnly,chain=false) {
       const fingerprint = await digest();
       let attempt = await load();
       if (checkOnly) {
-        if (!attempt || attempt.fingerprint !== fingerprint || !attempt.beforeCopyTabs) throw new Error('이 작업의 복사 요청 기록이 없습니다.');
+        if (!attempt || attempt.fingerprint !== fingerprint || !attempt.beforeCopyTabs) throw new Error('아직 복사 전 단계입니다. 시작하기를 눌러 이어서 진행해주세요.');
         const tab = await checkDraft(attempt);
         if (!tab) throw new Error('복사본을 아직 확인하지 못했습니다. 자동 재복사는 하지 않습니다.\n' + draftDiagnostics.join('\n'));
         await complete(attempt, tab); return;
@@ -145,28 +159,35 @@ async function lockedRun(checkOnly,chain=false) {
         }
         throw new Error('이전 복사 기록이 있습니다. 해당 작업 파일로 바꾼 뒤 시작하기를 눌러 결과를 확인해주세요. 다시 복사하지 않습니다.');
       }
-      const listTab = Number($('list-target').value);
-      if (!Number.isInteger(listTab) || !$('list-target').value) throw new Error('처리현황 창을 선택해 주세요.');
-      const token = crypto.randomUUID();
-      attempt = {fingerprint, token, listTab, source: job.source_application, stage: 'searching', started: new Date().toISOString()};
-      await save(attempt);
-      log('제품·화주로 기존 실적을 조회합니다.');
-      await invoke(listTab, 'search', {token});
-      const result = await poll(async () => { const value = await invoke(listTab, 'result', {token}); return value.status === 'matched' ? value : null; });
-      log('지정한 통관완료 실적의 제품·화주·제조업소가 일치합니다. 원문을 엽니다.');
-      await invoke(listTab, 'open', {token, signature: result.signature});
-      const original = await poll(async () => {
-        const found = [];
-        for (const tab of await tabs()) {
-          if (new URL(tab.url).pathname !== originalPath) continue;
-          try {
-            const result = await invoke(tab.id, 'original');
-            if (result.status === 'original_matched') found.push({tab, result});
-          } catch { /* Read-only matching before selecting any popup. */ }
+      let original=null;
+      if(attempt?.fingerprint===fingerprint&&['searching','original_requested'].includes(attempt.stage)){
+        original=await findOriginal();
+        if(!original&&attempt.stage==='original_requested'){
+          status('열린 원문을 확인하고 있습니다.');
+          try{original=await poll(findOriginal,6000);}catch(error){
+            throw Error('열린 원문을 확인하지 못했습니다. UNI-PASS에서 해당 실적의 원문보기 창을 하나 열고 시작하기를 눌러주세요. '+error.message);
+          }
         }
-        if (found.length > 1) throw new Error('같은 실적 원문보기 창이 여러 개입니다. 하나만 남겨 주세요. 아직 복사하지 않았습니다.');
-        return found[0];
-      });
+      }
+      if(resumeOnly&&!original){needsList=true;return;}
+      if(original){
+        log('열린 원문을 확인했습니다. 중단된 단계부터 이어갑니다.');
+      }else{
+        const listTab=Number($('list-target').value);
+        if(!Number.isInteger(listTab)||!$('list-target').value)throw Error('처리현황 창을 선택해주세요.');
+        const token=crypto.randomUUID();
+        attempt={fingerprint,token,listTab,source:job.source_application,stage:'searching',started:new Date().toISOString()};
+        await save(attempt);
+        log('제품·화주로 기존 실적을 조회합니다.');
+        await invoke(listTab,'search',{token});
+        const result=await poll(async()=>{const value=await invoke(listTab,'result',{token});return value.status==='matched'?value:null;});
+        log('지정한 통관완료 실적의 제품·화주·제조업소가 일치합니다. 원문을 엽니다.');
+        // Persist before opening: a lost response must not restart search/open.
+        attempt={...attempt,stage:'original_requested'};await save(attempt);
+        try{await invoke(listTab,'open',{token,signature:result.signature});}
+        catch{log('원문 열기 응답을 확인하지 못했습니다. 열린 원문을 확인합니다.');}
+        original=await poll(findOriginal);
+      }
       const guard = await watchLabelNotice(original.tab.id, log);
       try {
         log('원문 신청번호·제품·등록정보를 확인했습니다. 신청서복사를 한 번 요청합니다. 지정된 한글표시사항 안내는 자동 확인합니다.');
@@ -192,6 +213,7 @@ async function lockedRun(checkOnly,chain=false) {
   finally { busy = false; refresh(); }
   // The shared lock and notice debugger have been released before handoff.
   if(handoff!==null)location.assign('cargo-workflow.html?tab='+handoff+'&autorun=1');
+  return needsList;
 }
 $('start-sequence').addEventListener('click',async()=>{
   if(busy||starting||!job)return;
@@ -202,6 +224,9 @@ $('start-sequence').addEventListener('click',async()=>{
     const attempt=await load();
     if(attempt&&attempt.fingerprint===await digest()&&['copy_requested','copy_unknown','copy_verified'].includes(attempt.stage)){
       await lockedRun(true,canChain());return;
+    }
+    if(attempt?.fingerprint===await digest()&&['searching','original_requested'].includes(attempt.stage)){
+      if(!await lockedRun(false,canChain(),true))return;
     }
     if(await findLists())await lockedRun(false,canChain());
   }catch(error){status(error.message);}
