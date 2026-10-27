@@ -35,7 +35,7 @@ jobs:
       - name: Check model and updater recovery
         shell: pwsh
         run: |
-          node --test --test-isolation=none tests/model.test.mjs
+          node --test --test-isolation=none tests/model.test.mjs tests/sequence.test.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tests/CoreTests.csproj
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

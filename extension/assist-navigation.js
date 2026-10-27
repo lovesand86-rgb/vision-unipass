@@ -1,8 +1,12 @@
+import {sizeAssistWindow} from './assist-window.js';
+if(!location.pathname.endsWith('/assist.html'))void sizeAssistWindow();
 // Navigate within the existing app window; UNI-PASS stays in its own Chrome tab.
 let canNavigate=()=>true;
 export function openTool(path) { if(canNavigate())location.assign(chrome.runtime.getURL(path)); }
+export function continueInTool(path){canNavigate=()=>true;window.dispatchEvent(new Event('vision-handoff'));location.assign(chrome.runtime.getURL(path));}
 export function guardToolNavigation(isBusy) {
-  let changed=false;
+  let changed=false,handingOff=false;
+  window.addEventListener('vision-handoff',()=>{handingOff=true;});
   document.addEventListener('input',event=>{if(!event.target.closest('[data-routing]'))changed=true;});
   document.addEventListener('change',event=>{if(!event.target.closest('[data-routing]'))changed=true;});
   canNavigate=()=>{
@@ -12,7 +16,7 @@ export function guardToolNavigation(isBusy) {
   document.addEventListener('click',event=>{
     if(event.target.closest('[data-app-nav]')&&!canNavigate())event.preventDefault();
   });
-  window.addEventListener('beforeunload',event=>{if(isBusy()){event.preventDefault();event.returnValue='';}});
+  window.addEventListener('beforeunload',event=>{if(!handingOff&&isBusy()){event.preventDefault();event.returnValue='';}});
 }
 export async function chooseUnipassTab() {
   if(!await chrome.permissions.request({origins:['https://unipass.customs.go.kr/*']}))throw Error('UNI-PASS 화면 연결 권한이 필요합니다.');

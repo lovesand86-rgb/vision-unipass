@@ -53,7 +53,7 @@ static class Program {
   var desktop=Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);var shortcut=Path.Combine(desktop,"비전 어시스트.lnk");
   if(!File.Exists(shortcut)){dynamic shell=Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;dynamic lnk=shell.CreateShortcut(shortcut);lnk.TargetPath=exe;lnk.WorkingDirectory=State;lnk.Description="비전 어시스트";lnk.IconLocation=exe+",0";lnk.Save();}
  }
- public static void Open(Config c){var start=new ProcessStartInfo(c.chrome){UseShellExecute=false};start.ArgumentList.Add("--profile-directory="+c.profile);start.ArgumentList.Add("--window-size=920,760");start.ArgumentList.Add("--app=chrome-extension://"+c.extensionId+(File.Exists(Path.Combine(c.target,"assist.html"))?"/assist.html":"/popup.html"));Process.Start(start);}
+ public static void Open(Config c){var start=new ProcessStartInfo(c.chrome){UseShellExecute=false};start.ArgumentList.Add("--profile-directory="+c.profile);start.ArgumentList.Add("--window-size=460,560");start.ArgumentList.Add("--app=chrome-extension://"+c.extensionId+(File.Exists(Path.Combine(c.target,"assist.html"))?"/assist.html":"/popup.html"));Process.Start(start);}
  public static List<Config> Discover(){
   var all=new List<Config>();string chrome=FindChrome();string userData=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),@"Google\Chrome\User Data");if(!Directory.Exists(userData))return all;
   foreach(var dir in Directory.GetDirectories(userData).Where(d=>Path.GetFileName(d)=="Default"||Path.GetFileName(d).StartsWith("Profile "))){

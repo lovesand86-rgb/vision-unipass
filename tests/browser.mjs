@@ -4,7 +4,7 @@ import {assistFill} from '../extension/assist-fill.js';
 const root=resolve(import.meta.dirname,'..');await mkdir(root+'/artifacts/screenshots',{recursive:true});
 const context=await chromium.launchPersistentContext('/tmp/vision-assist-test-'+Date.now(),{executablePath:process.env.VISION_TEST_BROWSER||'/tmp/vision-playwright/chromium-1234/chrome-linux64/chrome',headless:true,ignoreDefaultArgs:['--disable-extensions'],args:['--no-sandbox','--disable-extensions-except='+root+'/extension','--load-extension='+root+'/extension'],viewport:{width:920,height:760}});
 let worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');const id=new URL(worker.url()).host;const page=await context.newPage();let errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('chrome-extension://'+id+'/assist.html');await page.getByRole('heading',{name:'오늘도, 간편하게.'}).waitFor();
+await page.goto('chrome-extension://'+id+'/assist.html');await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();
 await page.screenshot({path:root+'/artifacts/screenshots/01-home.png'});
 assert.equal(await page.locator('.tile').count(),4);const boxes=await page.locator('.tile').evaluateAll(es=>es.map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height,x:e.getBoundingClientRect().x,y:e.getBoundingClientRect().y})));
 assert.ok(boxes.every(b=>Math.abs(b.w-b.h)<1&&b.w>=150));assert.equal(boxes[0].y,boxes[1].y);assert.equal(boxes[0].x,boxes[2].x);

@@ -1,3 +1,4 @@
+import {sizeAssistWindow} from './assist-window.js';
 import {openTool} from './assist-navigation.js';
 import {VERSION,emptyState,newJob,validateJob,parseRows,readImport,cleanExport} from './assist-model.js';
 import {assistFill} from './assist-fill.js';
@@ -17,13 +18,14 @@ async function rpc(message){
 async function write(){state=await rpc({type:'write',state,expectedRevision:state.revision});}
 function toast(s){$('toast').textContent=s;$('toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.remove('show'),6000);}
 function on(id,fn,event='click'){$(id)?.addEventListener(event,async e=>{try{await fn(e);}catch(error){toast(error.message);}});}
-function head(title,desc){return `<button class="back" id="back">${icon('arrow')}처음으로</button><div class="page-head"><div><h1>${title}</h1><p>${desc}</p></div></div>`;}
+function head(title,desc){void sizeAssistWindow();return `<button class="back" id="back">${icon('arrow')}처음으로</button><div class="page-head"><div><h1>${title}</h1><p>${desc}</p></div></div>`;}
 function bindBack(){on('back',home);}
 function ensureLeave(){return !dirty||confirm('저장하지 않은 변경이 있습니다. 이 화면을 나갈까요?');}
 async function home(){if(!ensureLeave())return;dirty=false;job=null;capture=preview=null;screen='home';state=await rpc({type:'read'});renderHome();}
 function renderHome(){
+ void sizeAssistWindow(true);
  const count=state.jobs.length;
- main.innerHTML=`<section class="home"><span class="eyebrow">YOUR EVERYDAY ASSISTANT</span><h1>오늘도, 간편하게.</h1><p>반복되는 입력은 줄이고,<br>중요한 확인에 집중하세요.</p><div class="tiles"><button class="tile primary" id="history">${icon('history')}<strong>실적 기반 입력</strong><small>이전 실적에서 간편하게</small></button><button class="tile" id="new">${icon('new')}<strong>신규 자료 입력</strong><small>정리한 자료를 입력으로</small></button><button class="tile" id="resume">${icon('resume')}<strong>작업 이어하기${count?`<span class="work-count">${count}</span>`:''}</strong><small>남겨둔 작업을 이어서</small></button><button class="tile" id="update">${icon('update')}<strong>업데이트 확인</strong><small>항상 편리한 작업 환경</small></button></div><p class="home-note">하나의 공간에서, 차근차근.</p>${extension?'':'<p class="muted">디자인 미리보기 · PC 연결 기능은 설치 후 사용할 수 있습니다.</p>'}</section>`;
+ main.innerHTML=`<section class="home"><h1>무엇을 할까요?</h1><div class="tiles"><button class="tile primary" id="history">${icon('history')}<strong>실적 기반 입력</strong><small>이전 실적에서 간편하게</small></button><button class="tile" id="new">${icon('new')}<strong>신규 자료 입력</strong><small>정리한 자료를 입력으로</small></button><button class="tile" id="resume">${icon('resume')}<strong>작업 이어하기${count?`<span class="work-count">${count}</span>`:''}</strong><small>남겨둔 작업을 이어서</small></button><button class="tile" id="update">${icon('update')}<strong>업데이트 확인</strong><small>항상 편리한 작업 환경</small></button></div>${extension?'':'<p class="muted">디자인 미리보기 · PC 연결 기능은 설치 후 사용할 수 있습니다.</p>'}</section>`;
  on('history',history);on('new',()=>{job=newJob();editor();});on('resume',jobs);on('update',updates);
 }
 async function history(){

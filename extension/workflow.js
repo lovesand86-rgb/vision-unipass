@@ -1,4 +1,4 @@
-import {guardToolNavigation} from './assist-navigation.js';
+import {guardToolNavigation,continueInTool} from './assist-navigation.js';
 import {watchLabelNotice} from './label-notice.js';
 import {declarationStep} from './search-copy.js';
 import * as targets from './cargo-target.js';
@@ -212,7 +212,7 @@ async function lockedRun(checkOnly,chain=false,resumeOnly=false) {
   } catch (error) { log(error.message || '확인할 수 없는 오류로 중단했습니다.'); }
   finally { busy = false; refresh(); }
   // The shared lock and notice debugger have been released before handoff.
-  if(handoff!==null)location.assign('cargo-workflow.html?tab='+handoff+'&autorun=1');
+  if(handoff!==null)continueInTool('cargo-workflow.html?tab='+handoff+'&autorun=1');
   return needsList;
 }
 $('start-sequence').addEventListener('click',async()=>{

@@ -5,7 +5,7 @@ export async function cargoStep(request) {
     const fail = message => { throw new Error(message); };
     const job = request.job, token = request.token;
     const pre = 'CSW0101001S_', popupPre = 'MYC0801008Q_';
-    const popupPath = '/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do';
+    const popupPath = '/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do';
     const norm = v => String(v ?? '').replace(/\s/g, '').toUpperCase();
     const cargoNorm = v => norm(v).replace(/-/g, '');
     const one = id => { const nodes = document.querySelectorAll('#' + CSS.escape(id)); if (nodes.length !== 1) fail('필드를 하나로 확인하지 못했습니다: ' + id); return nodes[0]; };
@@ -158,7 +158,7 @@ export async function cargoStep(request) {
     if (!current.radio.checked || norm(value(pre+'mdlStszEnglNmPrlst')) !== norm(job.identity.product_name)) fail('대상 품목이 선택되어 있지 않습니다.');
     if (request.action === 'open_popup') {
       if (state.stage === 'popup_requested') fail('이미 조회창을 열었습니다. 열린 조회창 결과를 확인하세요.');
-      state.stage = 'popup_requested'; click(pre+'btnCargMtNoPrlst','검색'); return {status:'popup_requested'};
+      state.stage = 'popup_requested'; if(request.reuse_popup!==true)click(pre+'btnCargMtNoPrlst','검색'); return {status:'popup_requested'};
     }
     if (request.action === 'mark_selection') { if (state.stage !== 'popup_requested') fail('화물 조회창을 먼저 열어야 합니다.'); state.stage = 'selection_requested'; return {status:'selection_marked',parent_guard:{app:state.app,protected:state.protected}}; }
     fail('지원하지 않는 화물 연결 단계입니다.');

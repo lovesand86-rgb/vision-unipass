@@ -72,7 +72,11 @@ export async function runCommonSequence({invoke,job,applicationRef,log,stage,onC
 
   stage('contact','확인 중');
   const profiles=(await chrome.storage.local.get(profileKey))[profileKey]||{};
-  const contact=profiles[profileId(snapshot)];
+  let contact=profiles[profileId(snapshot)];
+  if(!validContact(contact)&&validContact({...snapshot,confirmed:true})){
+    await saveSequenceContact({invoke,snapshot,phone:snapshot.phone,mobile:snapshot.mobile});
+    contact={phone:snapshot.phone,mobile:snapshot.mobile,confirmed:true};
+  }
   if(!validContact(contact)){
     stage('contact','연락처 확인 필요');onContact(snapshot);
     log('현재 담당자의 확인된 연락처가 없어 아래에서 한 번 확인하면 이어갑니다.'+(entryError?' 반입일 미완료: '+entryError:''));

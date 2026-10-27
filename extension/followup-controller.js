@@ -7,7 +7,7 @@ const hash=async file=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',a
 const stateKey='visionProductStatesV1';
 const stable=v=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])):v;
 const productKey=b=>JSON.stringify([b.identity.importer_id,b.identity.manufacturer_id,b.identity.product_name]);
-export function createFollowup({invoke,log,stage,target,tabId}) {
+export function createFollowup({invoke,log,stage,target,tabId,getPhotos}) {
   let binding=null,details=null,entry=null,warehousePopup=null,agencyProof=null;
   // Form reads/writes always use the original declaration tab. Popup focus or
   // an invocation adapter's default must never change the destination.
@@ -15,7 +15,7 @@ export function createFollowup({invoke,log,stage,target,tabId}) {
   $('photo-panel').hidden=false;
   $('followup-panel').hidden=false;
   const readStore=async key=>(await chrome.storage.local.get(key))[key]||{};
-  const selectedFiles=()=>[...$('photos-label').files].map(file=>({slot:0,file})).concat([...$('photos-front').files].map(file=>({slot:9,file})),[...$('photos-other').files].map((file,i)=>({slot:10+i,file})));
+  const selectedFiles=getPhotos||(()=>[...$('photos-label').files].map(file=>({slot:0,file})).concat([...$('photos-front').files].map(file=>({slot:9,file})),[...$('photos-other').files].map((file,i)=>({slot:10+i,file}))));
   async function saveRules() {
     if(!binding||!details)throw Error('먼저 현재 신고서의 창고·제품상태를 읽어야 합니다.');
     const now=(await invokeForm(followupStep,{action:'read',binding})).details;
@@ -118,6 +118,7 @@ export function createFollowup({invoke,log,stage,target,tabId}) {
     if(!binding)throw Error('사진을 첨부할 현재 신고서를 먼저 확인해야 합니다.');
     await invokeForm(followupStep,{action:'read',binding});
     const pending=[];
+    stage('photos','준비 확인');
     const photos=selectedFiles();
     if(photos.filter(p=>p.slot>=10).length>9)throw Error('기타 사진은 최대 9개까지 가능합니다.');
     const prepared=[];

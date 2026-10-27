@@ -1,60 +1,36 @@
 <!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>비전 · 품목과 화물 자동 연결</title><link rel="stylesheet" href="assist.css"><link rel="stylesheet" href="workflow.css"><link rel="stylesheet" href="assist-tool.css">
-<header class="tool-header"><a class="brand" href="assist.html" data-app-nav><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><a class="icon-button" href="assist.html?view=settings" aria-label="설정" data-app-nav><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></svg></a></header><nav class="tool-nav"><a href="assist.html?view=history" data-app-nav>‹ 실적 기반 입력</a><span>비전 어시스트 작업 공간</span></nav><main><p class="eyebrow">VISION ASSIST · 실적 기반 입력</p>
-<h1>자료 입력</h1>
-<p>작업 내용을 확인하고 시작하세요. 한글표시는 직접 확인해주세요.</p>
+<header class="tool-header"><a class="brand" href="assist.html" data-app-nav><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><a class="icon-button" href="assist.html?view=settings" aria-label="설정" data-app-nav><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></svg></a></header><nav class="tool-nav"><a href="assist.html?view=history" data-app-nav>‹ 실적 기반 입력</a><span>비전 어시스트 작업 공간</span></nav><main class="compact-cargo"><p class="eyebrow">자료 입력</p>
+<h1>한 번에 입력</h1><p class="lead">사진을 준비하고 시작하세요. 입력 후 검토하면 됩니다.</p>
 <div id="cargo-summary" class="result"></div>
-<button id="start-cargo" disabled>입력 시작</button>
-<details><summary>입력 결과 다시 확인</summary><button id="check-cargo" class="secondary" disabled>품목 목록 확인</button></details>
-<details><summary>단계별 진행 상황</summary><ol aria-label="진행 단계">
-<li>품목 선택·화물 연결·소비기한·수정 — <strong id="stage-item">대기</strong></li>
-<li>공통사항 이동 — <strong id="stage-common">대기</strong></li>
-<li>선적일 입력 — <strong id="stage-shipment">대기</strong></li>
-<li>창고 반입일 조회·입력 — <strong id="stage-entry">대기</strong></li>
-<li>담당자 연락처 입력 — <strong id="stage-contact">대기</strong></li>
-<li>보관창고 조회·신고기관 — <strong id="stage-warehouse">대기</strong></li>
-<li>제품상태 — <strong id="stage-product">대기</strong></li>
-<li>한글표시 대조·수정 — <strong id="stage-label">사람이 직접 확인</strong></li>
-<li>사진 파일 선택 반영 — <strong id="stage-photos">대기</strong></li>
-</ol></details>
+<section id="photo-panel"><h2>사진</h2><div id="photo-picker"></div>
+<button id="followup-run" class="secondary" hidden>사진만 첨부</button><p id="photo-result" class="result"></p></section>
+<div class="run-actions"><button id="start-cargo" disabled>입력 시작</button><button id="review-form" class="secondary" hidden>유니패스에서 검토</button></div>
 <p id="cargo-status" class="result" role="status" aria-live="polite">작업 정보를 읽고 있습니다.</p>
-<section id="item-repair" hidden>
-<h2>품목 목록의 현재값 확인</h2>
-<p>이전 수정 시도 뒤 목록에 반영된 값을 다시 읽었습니다. 다른 값이 있는 항목은 아래에 표시합니다.</p>
-<pre id="item-repair-values" class="result"></pre>
-<p id="item-repair-note"></p>
-<label class="ack"><input id="item-repair-ack" type="checkbox">현재값과 예정값을 확인했고, 이 품목을 다시 수정합니다.</label>
-<button id="item-repair-run" disabled>확인한 품목 수정 1회·이어하기</button>
-</section>
-<section id="sequence-contact" hidden>
-<h2>처음 쓰는 담당자 연락처 확인</h2><p id="sequence-person"></p>
+<section id="sequence-contact" hidden><h2>연락처 추가</h2><p id="sequence-person"></p>
 <label for="sequence-phone">전화번호</label><input id="sequence-phone" type="tel">
 <label for="sequence-mobile">휴대전화번호</label><input id="sequence-mobile" type="tel">
-<label class="ack"><input id="sequence-ack" type="checkbox">현재 신청인의 연락처가 맞습니다.</label>
-<button id="sequence-save-contact" disabled>이 연락처 기억하고 이어서 입력</button>
-</section>
-<section id="followup-panel" hidden>
-<h2>창고·신고기관·제품상태</h2>
-<p id="warehouse-details" class="result"></p>
-<p>신고기관은 이번 창고 조회 결과에서 읽습니다. 창고명이나 이전 신고기관으로 추정하지 않습니다.</p>
-<button id="warehouse-only-run">창고·신고기관·제품상태만 다시 확인</button>
-<p>화물 반입 이력을 조회해 창고를 확인합니다. 품목·날짜·연락처와 사진은 다시 입력하지 않습니다.</p>
-<details><summary>제품상태 확인 기준</summary><div id="product-states"></div>
-<label class="ack"><input id="states-ack" type="checkbox">이번 제품에 맞는 제품상태를 확인했습니다.</label>
-<button id="save-product-rule">제품상태 기억하고 이어하기</button></details>
-</section>
-<section id="photo-panel" hidden>
-<h2>이번 제품 사진</h2>
-<p>선택한 사진을 신고서에 첨부합니다. 한글표시 내용은 사람이 직접 대조·수정합니다.</p>
-<p>원본을 선택하면 아래 슬롯에 넣고 파일명·크기·해시를 확인합니다. 저장·접수 완료를 뜻하지 않습니다.</p>
-<label for="photos-label">1번: 한글표시 사진</label><input id="photos-label" type="file" accept=".png,.jpg,.jpeg,.bmp,.gif,.tif,.pdf">
-<label for="photos-front">10번 첫 슬롯: 제품 전면 사진</label><input id="photos-front" type="file" accept=".png,.jpg,.jpeg,.bmp,.gif,.tif,.pdf">
-<label for="photos-other">10번 나머지: 기한·기타 사진 (최대 9개)</label><input id="photos-other" type="file" multiple accept=".png,.jpg,.jpeg,.bmp,.gif,.tif,.pdf">
-<button id="followup-run">선택한 사진 첨부</button><p id="photo-result" class="result"></p>
-
-</section>
-<section id="final-panel" hidden>
-<h2>오류검증·임시저장·전송</h2>
+<button id="sequence-save-contact">저장하고 계속</button></section>
+<details id="input-details"><summary>입력 결과·상세 정보</summary>
+<ol aria-label="진행 단계">
+<li>품목·화물·소비기한 — <strong id="stage-item">대기</strong></li>
+<li>공통사항 — <strong id="stage-common">대기</strong></li>
+<li>선적일 — <strong id="stage-shipment">대기</strong></li>
+<li>반입일 — <strong id="stage-entry">대기</strong></li>
+<li>연락처 — <strong id="stage-contact">대기</strong></li>
+<li>창고·기관 — <strong id="stage-warehouse">대기</strong></li>
+<li>제품상태 — <strong id="stage-product">대기</strong></li>
+<li>한글표시 — <strong id="stage-label">직접 검토</strong></li>
+<li>사진 — <strong id="stage-photos">대기</strong></li></ol>
+<button id="check-cargo" class="secondary" disabled>입력 결과 읽기</button>
+<section id="item-repair" hidden><h2>아직 반영되지 않은 항목</h2><pre id="item-repair-values" class="result"></pre><p id="item-repair-note"></p></section>
+<section id="followup-panel" hidden><h2>창고·제품상태</h2><p id="warehouse-details" class="result"></p>
+<button id="warehouse-only-run" class="secondary">창고·제품상태만 확인</button>
+<details><summary>제품상태 설정</summary><div id="product-states"></div>
+<label class="ack"><input id="states-ack" type="checkbox">이 제품의 기본값으로 기억</label>
+<button id="save-product-rule">저장하고 계속</button></details></section>
+</details>
+<details id="final-panel" hidden><summary>검토 후 저장·전송</summary>
 <p>입력과 사진 첨부를 마친 뒤 사용하세요. 한글표시사항은 직접 대조·수정해 주세요.</p>
 <button id="final-read">최종 입력내용 읽기</button>
 <pre id="final-summary" class="result"></pre>
@@ -75,8 +51,7 @@
 <p>아래 버튼은 실제 신고서를 전송합니다. 현재 내용의 오류검증과 임시저장 결과가 확인되어야 실행할 수 있습니다. 전송 후 접수·수리 상태는 유니패스 처리현황에서 확인하세요.</p>
 <button id="final-send" disabled>최종 신고서 전송</button>
 <details><summary>검증·저장·전송 실행 기록</summary><pre id="final-history" class="result"></pre></details>
-</section>
-<details><summary>진행 기록</summary><ol id="cargo-log"></ol><button id="export-progress" class="secondary">기록 저장</button></details>
-<details><summary>다른 화물 작업 파일 사용</summary><input id="cargo-file" type="file" accept=".json,application/json"></details>
-<p class="note">입력·사진 버튼은 입력까지만 처리합니다. 오류검증·임시저장은 위 최종 단계에서 실행하고, 전송은 ‘최종 신고서 전송’ 버튼으로 실행합니다.</p>
+</details>
+<details class="extra-tools"><summary>진행 기록·작업 파일</summary><ol id="cargo-log"></ol><button id="export-progress" class="secondary">기록 저장</button><label for="cargo-file">다른 작업 파일</label><input id="cargo-file" type="file" accept=".json,application/json"></details>
+<p class="note">입력 완료 후 유니패스에서 검토하세요. 저장·전송은 별도로 실행합니다.</p>
 </main><script type="module" src="cargo-workflow.js"></script></html>

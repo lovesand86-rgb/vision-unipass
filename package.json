@@ -1,6 +1,6 @@
 {
   "name": "vision-assist",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "test:navigation": "node tests/navigation.mjs",
     "test:recovery": "node tests/workflow-recovery.mjs",
     "test:warehouse": "node tests/warehouse-lookup.mjs",
-    "test:restart": "node tests/restart.mjs"
+    "test:restart": "node tests/restart.mjs",
+    "test:simple": "node tests/simple-input.mjs"
   }
 }

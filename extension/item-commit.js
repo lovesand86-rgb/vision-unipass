@@ -48,8 +48,8 @@ export async function itemCommitStep(request) {
       cargo(['cargMtNoPrlst1','cargMtNoPrlst2','cargMtNoPrlst3'].map(val).join(''))===cargo(job.identity.cargo_mt_no)&&norm(val('blNoCn'))===norm(job.identity.bl);
     const rowNow=identity();
     const previous=window.__visionItemCommit;
-    const checkBound=s=>{
-      if(!s||s.signature!==signature||s.token!==request.token||s.numberNode!==one('reqRqstNo3')||s.table!==rowNow.table||JSON.stringify(s.app)!==JSON.stringify(app()))fail('품목 수정 대상 신고서가 바뀌었습니다.');
+    const checkBound=(s,readOnly=false)=>{
+      if(!s||s.signature!==signature||s.token!==request.token||s.numberNode!==one('reqRqstNo3')||(!readOnly&&s.table!==rowNow.table)||JSON.stringify(s.app)!==JSON.stringify(app()))fail('품목 수정 대상 신고서가 바뀌었습니다.');
       if(s.protected!==protectedValues())fail('제조공정 또는 성분 정보가 변경돼 중단했습니다.');
     };
     const differences=()=>[
@@ -60,12 +60,13 @@ export async function itemCommitStep(request) {
       ['소비기한',rowNow.data.expiry_date,job.fields.expiry_date.value,date],
       ['B/L',val('blNoCn'),job.identity.bl,norm]
     ].map(([label,current,expected,normalize])=>({label,current,expected,matches:normalize(current)===normalize(expected)}));
-    // Reviewing an interrupted update is read-only. Retrying requires this
-    // exact review token and a separate, explicit user action in the tool UI.
+    // Read before a bounded recovery in the user's start action. Recovery must
+    // still use this exact snapshot/token and can only update the existing row.
     if(request.action==='review'){
       if(!document.documentElement.dataset.visionItemCommitToken)return {status:'no_attempt'};
+      if(previous&&(previous.signature!==signature||JSON.stringify(previous.app)!==JSON.stringify(app())||previous.protected!==protectedValues()))fail('이전 입력과 현재 신청서가 다릅니다. 현재 작업 대상을 확인해주세요.');
       const rows=differences(),canRepair=rows.some(r=>!r.matches)&&
-        (!cargo(rowNow.data.cargo)||cargo(rowNow.data.cargo)===cargo(job.identity.cargo_mt_no)||editorReady(rowNow));
+        (!cargo(rowNow.data.cargo)||cargo(rowNow.data.cargo)===cargo(job.identity.cargo_mt_no));
       window.__visionItemRepair={token:request.token,signature,app:app(),numberNode:one('reqRqstNo3'),table:rowNow.table,
         protected:protectedValues(),gridBefore:JSON.stringify(rowNow.data),bl:val('blNoCn'),marker:document.documentElement.dataset.visionItemCommitToken,canRepair,used:false};
       return {status:'repair_review',rows,can_repair:canRepair,token:request.token};
@@ -105,15 +106,20 @@ export async function itemCommitStep(request) {
       }
     }
     if(request.action==='inspect'){
+      if(rowNow.matches&&norm(val('blNoCn'))===norm(job.identity.bl)){
+        if(previous?.signature===signature)checkBound({...previous,token:request.token},true);
+        return {status:'committed',values:rowNow.data,application_ref:app()};
+      }
       if(previous?.signature===signature&&['applying','commit_requested','committed'].includes(previous.stage)){
         return {status:'check_only',token:previous.token};
       }
-      if(rowNow.matches&&norm(val('blNoCn'))===norm(job.identity.bl))return {status:'committed',values:rowNow.data,application_ref:app()};
       if(document.documentElement.dataset.visionItemCommitToken)fail('이 화면에 품목 수정 시도 기록이 있습니다. 목록의 반영값을 확인하지 못해 자동 재수정하지 않습니다.');
       return {status:editorReady(rowNow)?'ready':'needs_cargo'};
     }
     if(request.action==='verify'){
-      checkBound(previous);
+      // The site may replace only the grid after its local update. A read may
+      // verify the new grid; write actions must still use their exact DOM.
+      checkBound(previous,true);
       if(!['commit_requested','committed'].includes(previous.stage))fail('수정 버튼 실행을 확인하지 못했습니다. 현재 입력칸을 확인해 주세요.');
       if(!rowNow.matches||norm(val('blNoCn'))!==norm(job.identity.bl))return {status:'waiting'};
       previous.stage='committed';return {status:'committed',values:rowNow.data,application_ref:app()};
