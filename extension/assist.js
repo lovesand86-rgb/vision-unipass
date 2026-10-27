@@ -118,7 +118,7 @@ async function checkUpdate(){
 }
 async function nativeAction(command){
  $('update-status').textContent=command==='apply'?'업데이트를 검증하고 적용합니다.':'이전 버전을 복구합니다.';
- try{const r=await native(command);$('update-status').textContent=r.message||'완료했습니다. 다시 열면 적용됩니다.';$('update-action').innerHTML='<button class="button green" id="reload-app">새 버전으로 다시 열기</button>';on('reload-app',async()=>{await rpc({type:'reload'});});}
+ try{const r=await native(command);$('update-status').textContent=r.message||'완료했습니다. 다시 열면 적용됩니다.';$('update-action').innerHTML='<button class="button green" id="reload-app">새 버전으로 다시 열기</button>';on('reload-app',async e=>{const button=e.currentTarget;button.disabled=true;button.textContent='다시 여는 중…';try{await rpc({type:'reload'});}catch(error){button.disabled=false;button.textContent='새 버전으로 다시 열기';throw error;}});}
  catch(e){$('update-status').className='status error';$('update-status').textContent=e.message;}
 }
 async function settings(){
