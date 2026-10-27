@@ -31,7 +31,7 @@ export function createFollowup({invoke,log,stage,target,tabId}) {
     if(agencyProof&&agencyProof.key===boundKey&&Date.now()-agencyProof.at<600000&&agencyProof.result.agency===details.agency){
       log('이번 실행에서 조회한 창고·신고기관과 현재값이 같아 조회창을 다시 열지 않습니다.');return agencyProof.result;
     }
-    const path='/csp/csw/informt/cdmt/openCSW0302065Q.do';
+    const path='/csp/csw/infomt/cdmt/openCSW0302065Q.do';
     const tabs=()=>chrome.tabs.query({url:'https://unipass.customs.go.kr/*'});
     const isWarehouse=t=>{try{return new URL(t.url).pathname===path&&(t.openerTabId===undefined||t.openerTabId===tabId);}catch{return false;}};
     const before=(await tabs()).map(t=>t.id),openToken=crypto.randomUUID();

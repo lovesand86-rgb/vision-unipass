@@ -8,7 +8,7 @@ export async function warehouseStep(request) {
     // This lookup only reads the agency; it never clicks a returned warehouse.
     // A fresh launch marker + observed endpoint + complete opener identity binds
     // read-only queries even when the site's optional return-field hint is absent.
-    if(location.pathname!=='/csp/csw/informt/cdmt/openCSW0302065Q.do')fail('식약보관창고 조회창 경로가 아닙니다: '+location.pathname);
+    if(location.pathname!=='/csp/csw/infomt/cdmt/openCSW0302065Q.do')fail('식약보관창고 조회창 경로가 아닙니다: '+location.pathname);
     if(request.action==='probe'&&document.readyState==='loading')return {status:'waiting'};
     const doc=window.opener?.document;
     if(!doc||window.opener.location.origin!==location.origin||window.opener.location.pathname!=='/csp/index.do')fail('창고 조회창의 원래 신고서를 확인하지 못했습니다.');

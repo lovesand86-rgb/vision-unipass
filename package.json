@@ -1,6 +1,6 @@
 {
   "name": "vision-assist",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "test:ui": "node tests/browser.mjs",
     "package": "python tools/package.py",
     "test:navigation": "node tests/navigation.mjs",
-    "test:recovery": "node tests/workflow-recovery.mjs"
+    "test:recovery": "node tests/workflow-recovery.mjs",
+    "test:warehouse": "node tests/warehouse-lookup.mjs"
   }
 }
