@@ -15,9 +15,9 @@ const target = Number(new URL(location.href).searchParams.get('tab'));
 // Exact pathname captured in the user's progress export (2026-10-28).
 const popupPath = '/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do';
 const key = 'visionCargoAttemptV1';
-let job = cargoTarget, busy = false, contactSnapshot=null, activeStage='item', itemRepair=null, finalActions=null,lastError='';
-const phaseNames={item:'품목·화물',common:'공통사항',shipment:'선적일',entry:'반입일',contact:'연락처',warehouse:'창고·기관',product:'제품상태',photos:'사진'};
-const photos=createPhotoPicker($('photo-picker'),()=>refreshPhotoAction());
+let job = cargoTarget, busy = false, contactSnapshot=null, activeStage='item', itemRepair=null, finalActions=null,lastError='',attachmentsDirty=false;
+const phaseNames={item:'품목·화물',common:'공통사항',shipment:'선적일',entry:'반입일',contact:'연락처',warehouse:'창고·기관',product:'제품상태',photos:'사진',validation:'오류검증'};
+const photos=createPhotoPicker($('photo-picker'),()=>{attachmentsDirty=true;finalActions?.invalidate();refresh();});
 function refreshPhotoAction(){$('followup-run').hidden=!photos.ready()||!followup||$('stage-item').textContent!=='확인 완료';}
 const stage=(key,value)=>{activeStage=key;const node=$('stage-'+key);if(node)node.textContent=value;if(busy)$('cargo-status').textContent=(phaseNames[key]||'입력')+' · '+value;};
 const log = message => { const li = document.createElement('li'); li.textContent = message; $('cargo-log').append(li); };
@@ -26,9 +26,15 @@ const refresh = () => { $('start-cargo').disabled = busy || !job; $('check-cargo
   $('sequence-save-contact').disabled=busy||!contactSnapshot;
   for(const id of ['followup-run','warehouse-only-run','save-product-rule','states-ack'])$(id).disabled=busy;
   $('export-progress').disabled=busy;
-  finalActions?.refresh(busy||!job||!commonForThisJob());
+  finalActions?.refresh(busy||attachmentsDirty||!job||!commonForThisJob());
   $('final-panel').hidden=!job||!commonForThisJob();
   photos.setBusy(busy);refreshPhotoAction();$('start-cargo').textContent=busy?'입력 중…':'입력 시작·이어하기';
+  const finalState=finalActions?.state();
+  $('start-cargo').hidden=!!(finalState?.ready||finalState?.sent);
+  $('photo-panel').hidden=!!(finalState?.ready||finalState?.sent);
+  $('cargo-status').hidden=!!(finalState?.ready||finalState?.sent);
+  $('workflow-heading').textContent=finalState?.sent?'전송 완료':finalState?.ready?'전송 준비 완료':'한 번에 입력';
+  $('workflow-lead').textContent=finalState?.sent?'유니패스에서 전송 완료 안내를 확인했습니다.':finalState?.ready?'입력·첨부와 오류검증을 마쳤습니다.':'첨부할 파일을 준비하고 시작하세요.';
   $('review-form').disabled=busy;
   $('review-form').hidden=$('stage-item').textContent!=='확인 완료';
 };
@@ -71,7 +77,7 @@ if(commonTarget)finalActions=createFinalActions({invoke:invokeCommon,identity:co
     try{await navigator.locks.request('vision-unipass-search-copy',{ifAvailable:true},async lock=>{
       if(!lock)throw Error('다른 도구 작업이 끝난 뒤 다시 눌러 주세요.');
       await task();
-    });}catch(error){log(error.message);}finally{busy=false;refresh();}
+    });}catch(error){log(error.message);}finally{busy=false;refresh();showResult();}
   }});
 const onContact=s=>{contactSnapshot=s;$('sequence-contact').hidden=false;$('sequence-person').textContent='현재 신청인: '+s.context.aplcNm;
   $('sequence-phone').value=s.phone;$('sequence-mobile').value=s.mobile;};
@@ -126,6 +132,7 @@ async function finishItem(checkOnly=false) {
     log(common.status==='common_partial'?`품목·선적일·연락처는 확인했습니다. 반입일 미완료: ${common.entry_error}`:`품목·선적일·반입일·신청인 연락처 입력과 최종 대조를 마쳤습니다.\n선적일 ${common.shipment} / 반입일 ${common.entry}\n공통사항 값 확인 완료. 오류검증·임시저장·전송은 하지 않았습니다.`);
     if(additional)log((common.entry_error?'반입일 미완료: '+common.entry_error+'\n':'')+(additional.pending.length?'남은 확인: '+additional.pending.join(' / '):'신고기관·제품상태·사진 선택 반영을 확인했습니다. 한글표시 내용은 사람이 직접 확인·수정해 주세요.')+'\n오류검증·임시저장·전송은 하지 않았습니다.');
     if(additional?.pending.length||common.entry_error)return true;
+    if(additional&&finalActions){attachmentsDirty=false;await validateAfterInput();}
   }
   await focusForm();return true;
 }
@@ -141,7 +148,7 @@ const verify = async (record,checkOnly=false) => {
 };
 async function run(checkOnly=false,repairToken=null) {
   if (busy || !job) return;
-  busy=true;lastError='';activeStage='item';refresh();
+  busy=true;lastError='';activeStage='item';if(!checkOnly){finalActions?.invalidate();stage('validation','대기');}activeStage='item';refresh();
   try {
     await navigator.locks.request('vision-unipass-search-copy',{ifAvailable:true},async lock=>{
       if (!lock) throw new Error('다른 비전 도구 작업이 끝난 뒤 실행해 주세요.');
@@ -231,7 +238,17 @@ async function run(checkOnly=false,repairToken=null) {
   } catch(error) { lastError=error.message;const stopped=activeStage;stage(stopped,'중단');log(error.message || '진행을 중단했습니다.');if(stopped==='item')await reviewInterruptedItem(); }
   finally { busy=false;refresh();showResult(); }
 }
+async function validateAfterInput(){
+ stage('validation','확인 중');log('입력·첨부를 마쳤습니다. 오류검증을 실행합니다.');
+ const result=await finalActions.prepare();
+ stage('validation',result.ready||result.sent?'통과':'확인 필요');
+ if(result.ready||result.sent)$('final-panel').open=false;
+ if(!result.ready&&!result.sent){$('final-panel').open=true;log('오류검증 결과를 확인해주세요. 자동 전송하지 않았습니다.');}
+}
+$('edit-input').addEventListener('click',()=>{if(busy)return;finalActions?.invalidate();stage('validation','대기');refresh();showResult();$('final-panel').open=true;});
 function showResult(){
+ const finalState=finalActions?.state();
+ if(finalState?.ready||finalState?.sent){$('cargo-status').textContent=finalState.sent?'전송 완료 안내를 확인했습니다.':'오류검증 통과 · 전송 준비 완료';$('cargo-status').classList.remove('warning');return;}
  const pending=Object.keys(phaseNames).filter(k=>!$('stage-'+k).textContent.includes('완료')&&!$('stage-'+k).textContent.includes('반영 확인')&&!$('stage-'+k).textContent.includes('기존 파일 선택 확인'));
  $('cargo-status').textContent=lastError||($('stage-item').textContent==='확인 완료'?(pending.length?'입력된 내용을 검토하세요. 남은 항목: '+pending.map(k=>phaseNames[k]).join(' · '):'입력을 마쳤습니다. 유니패스에서 검토하세요.'):'입력할 자료를 준비하고 시작하세요.');
  $('cargo-status').classList.toggle('warning',!!lastError);
@@ -240,6 +257,7 @@ $('review-form').addEventListener('click',()=>focusForm().catch(error=>{$('cargo
 $('start-cargo').addEventListener('click',()=>run());
 $('check-cargo').addEventListener('click',()=>run(true));
 $('cargo-file').addEventListener('change',async()=>{
+  finalActions?.invalidate();
   try {
     const file=$('cargo-file').files[0]; if (!file || file.size>100000) throw new Error('100KB 이하의 화물 연결 작업 JSON을 선택해 주세요.');
     job=JSON.parse(await file.text());summary();
@@ -254,7 +272,7 @@ $('export-progress').addEventListener('click',async()=>{
     try{diagnostics=await invokeCommon(followupStep,{action:'diagnostics'});}catch(error){diagnostics={error:error.message};}
     const report={format:'vision-unipass-progress',version:1,created_at:new Date().toISOString(),tool:'VISION ASSIST · 실적 기반 입력',app_version:chrome.runtime.getManifest().version,
       browser:{target_tab:target,popups:(await tabs()).filter(t=>t.id!==target).flatMap(t=>{try{return [{id:t.id,opener_tab:t.openerTabId,path:new URL(t.url).pathname}];}catch{return [];}})},
-      stages:Object.fromEntries(['item','common','shipment','entry','contact','warehouse','product','label','photos'].map(k=>[k,$('stage-'+k).textContent])),
+      stages:Object.fromEntries(['item','common','shipment','entry','contact','warehouse','product','label','photos','validation'].map(k=>[k,$('stage-'+k).textContent])),
       log:[...$('cargo-log').children].map(n=>n.textContent),final_actions:finalActions?.report(),diagnostics};
     const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
     const a=document.createElement('a');a.href=url;a.download='vision-progress-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json';a.click();
@@ -297,7 +315,7 @@ $('warehouse-only-run').addEventListener('click',runWarehouse);
 async function runPhotos(){
   if(busy||!followup)return;
   if(!photos.ready()){$('cargo-status').textContent='사진에서 한글표시와 제품 전면을 골라주세요.';return;}
-  busy=true;refresh();
+  busy=true;lastError='';refresh();
   try{
     await navigator.locks.request('vision-unipass-search-copy',{ifAvailable:true},async lock=>{
       if(!lock)throw Error('다른 비전 도구 작업이 끝난 뒤 실행해 주세요.');
@@ -311,9 +329,10 @@ async function runPhotos(){
       log('현재 신고서를 확인하고 사진 첨부만 진행합니다.');
       const result=await followup.attachPhotos(snapshot);
       $('cargo-status').textContent='사진 첨부를 확인했습니다. 유니패스에서 검토하세요.';log('사진 작업 결과: '+(result.pending.length?result.pending.join(' / '):'파일 선택 반영 확인')+'\n한글표시 내용은 사람이 직접 확인·수정해 주세요.'+'\n오류검증·임시저장·전송은 하지 않았습니다.');
+      if(!result.pending.length&&finalActions){attachmentsDirty=false;await validateAfterInput();}
     });
-  }catch(error){stage(activeStage,'중단');$('cargo-status').textContent=error.message;log(error.message);}
-  finally{busy=false;refresh();}
+  }catch(error){lastError=error.message;stage(activeStage,'중단');$('cargo-status').textContent=error.message;log(error.message);}
+  finally{busy=false;refresh();showResult();}
 }
 $('followup-run').addEventListener('click',runPhotos);
 $('save-product-rule').addEventListener('click',async()=>{

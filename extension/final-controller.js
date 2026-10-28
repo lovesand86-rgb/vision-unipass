@@ -14,13 +14,19 @@ export function createFinalActions({invoke,runExclusive,identity,log,tabId}){
   const belongs=a=>review&&(a.form_id===review.form_id||review.application_ref[2]&&sameApp(a.application_ref,review.application_ref));
   const successful=kind=>{const latest=record?.attempts.findLast(a=>a.kind===kind&&a.digest===review?.digest&&belongs(a));return latest&&['user_confirmed_success','site_confirmed_success'].includes(latest.outcome);};
   const sent=()=>record?.attempts.some(a=>a.kind==='send'&&a.outcome!=='not_requested'&&belongs(a));
+  const state=()=>({ready:!!review&&!pending()&&!sent()&&!!successful('validate'),sent:!!record?.attempts.some(a=>a.kind==='send'&&belongs(a)&&['user_confirmed_success','site_confirmed_success'].includes(a.outcome)),pending:!!pending()});
   function refresh(isBusy=busy){
     busy=isBusy;
     $('final-read').disabled=busy;
     $('final-validate-save').disabled=busy||!review||!!pending()||!!sent()||successful('save');
-    $('final-validate').disabled=busy||!review||!!pending()||!!sent();
+    $('final-validate').disabled=busy||!!pending()||!!sent();
     $('final-save').disabled=busy||!review||!!pending()||!!sent()||!successful('validate')||successful('save');
-    $('final-send').disabled=busy||!review||!!pending()||!!sent()||!successful('validate')||!successful('save')||!review.application_ref[2];
+    $('final-send').disabled=busy||!state().ready;
+    const current=state();$('ready-panel').hidden=!current.ready&&!current.sent;
+    $('ready-title').textContent=current.sent?'전송 완료 안내를 확인했습니다':'전송 준비 완료';
+    $('ready-note').textContent=current.sent?'접수 상태는 유니패스 처리현황에서 확인하세요.':'내용을 검토한 뒤 전송하세요.';
+    $('final-send').hidden=current.sent;
+    $('edit-input').disabled=busy;
     $('final-result-record').disabled=busy||!pending()||!review;
     $('final-result').disabled=busy||!pending();$('final-result-note').disabled=busy||!pending();
   }
@@ -32,6 +38,7 @@ export function createFinalActions({invoke,runExclusive,identity,log,tabId}){
     refresh();
   }
   async function read(){
+    review=null;refresh();
     record=await load();
     const r=await invoke(finalStep,{action:'read',identity});review=r.snapshot;
     const s=review.summary;
@@ -47,7 +54,7 @@ export function createFinalActions({invoke,runExclusive,identity,log,tabId}){
     if(kind==='save'&&successful('save'))throw Error('현재 내용은 이미 임시저장 결과를 확인했습니다.');
     if(kind==='send'&&(!successful('save')||!review.application_ref[2]))throw Error('현재 내용의 임시저장 결과와 신청번호가 필요합니다.');
     const fresh=(await invoke(finalStep,{action:'read',identity})).snapshot;
-    if(fresh.digest!==review.digest||fresh.form_id!==review.form_id||!sameApp(fresh.application_ref,review.application_ref))throw Error('검토 이후 신고서가 바뀌었습니다. 최종 입력내용을 다시 읽어 주세요.');
+    if(fresh.digest!==review.digest||fresh.form_id!==review.form_id||!sameApp(fresh.application_ref,review.application_ref)){review=null;render();throw Error('신고서 내용이 바뀌었습니다. 오류검증을 다시 진행해주세요.');}
     // Attach before the action; the action is not attempted if observation cannot start.
     const watcher=await watchFinalDialog(tabId,kind,message=>{$('final-notices').textContent=message;$('final-result-note').value=message;});
     const attempt={token:crypto.randomUUID(),kind,digest:review.digest,form_id:review.form_id,application_ref:review.application_ref,at:new Date().toISOString(),outcome:'unconfirmed'};
@@ -91,7 +98,20 @@ export function createFinalActions({invoke,runExclusive,identity,log,tabId}){
     await save();review=current;$('final-result-note').value='';render();
     log(names[attempt.kind]+' 결과를 사용자 확인으로 기록했습니다. '+(attempt.kind==='send'?'식약처 접수·수리 완료를 자동 확인한 것은 아닙니다.':''));
   }
-  function bind(id,fn){$(id).addEventListener('click',()=>runExclusive(async()=>{try{await fn();}catch(error){$('final-status').textContent=error.message;log(error.message);}}));}
-  bind('final-read',read);bind('final-validate',()=>execute('validate'));bind('final-validate-save',async()=>{if(await execute('validate'))await execute('save');});bind('final-save',()=>execute('save'));bind('final-send',()=>execute('send'));bind('final-result-record',recordResult);
-  refresh();return {refresh,read,report:()=>({review_digest:review?.digest,record})};
+  async function prepare(){
+    await read();
+    if(pending()||sent())return state();
+    if(!successful('validate'))await execute('validate');
+    return state();
+  }
+  async function sendReviewed(){
+    if(!state().ready)throw Error('현재 내용의 오류검증 결과를 확인해주세요.');
+    // The user's send click authorizes the prerequisite save; preparation never saves or sends.
+    if(!successful('save')&&!await execute('save'))return;
+    await execute('send');
+  }
+  function invalidate(){review=null;render();}
+  function bind(id,fn){$(id).addEventListener('click',()=>runExclusive(async()=>{try{await fn();}catch(error){$('final-status').textContent=error.message;$('final-panel').open=true;log(error.message);}}));}
+  bind('final-read',read);bind('final-validate',prepare);bind('final-validate-save',async()=>{if(await execute('validate'))await execute('save');});bind('final-save',()=>execute('save'));bind('final-send',sendReviewed);bind('final-result-record',recordResult);
+  refresh();return {refresh,read,prepare,state,invalidate,report:()=>({review_digest:review?.digest,record})};
 }
