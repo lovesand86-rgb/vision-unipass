@@ -12,7 +12,8 @@ import {createFinalActions} from './final-controller.js';
 const {cargoTarget,itemTarget,commonTarget,followupTarget}=targets;
 const $ = id => document.getElementById(id);
 const target = Number(new URL(location.href).searchParams.get('tab'));
-const popupPaths = ['/csp/myc/comm/CommCdCtr/openMYC0801008Q.do','/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do'];
+// Exact pathname captured in the user's progress export (2026-10-28).
+const popupPath = '/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do';
 const key = 'visionCargoAttemptV1';
 let job = cargoTarget, busy = false, contactSnapshot=null, activeStage='item', itemRepair=null, finalActions=null,lastError='';
 const phaseNames={item:'품목·화물',common:'공통사항',shipment:'선적일',entry:'반입일',contact:'연락처',warehouse:'창고·기관',product:'제품상태',photos:'사진'};
@@ -37,7 +38,7 @@ const summary = () => {
   $('cargo-status').textContent='시작하면 준비된 값을 입력합니다.';refresh();
 };
 const tabs = () => chrome.tabs.query({url:'https://unipass.customs.go.kr/*'});
-const isPopup = tab => { try { return popupPaths.includes(new URL(tab.url).pathname); } catch { return false; } };
+const isPopup = tab => { try { return new URL(tab.url).pathname === popupPath; } catch { return false; } };
 const fingerprint = async () => [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(job))))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const save = record => chrome.storage.local.set({[key]:record});
 const call = async (tabId, action, token, extra={}, func=cargoStep, payload=job, timeout=15000) => {

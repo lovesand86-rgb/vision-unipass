@@ -1,0 +1,9 @@
+{
+  "source": "User progress export 2026-10-28T05:53:38.269Z, app 1.0.7; tab IDs replaced with synthetic IDs",
+  "target_tab": 10,
+  "popup": {
+    "id": 20,
+    "openerTabId": 10,
+    "path": "/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do"
+  }
+}

@@ -11,6 +11,7 @@ const item={format:'vision-unipass-item-commit',version:1,identity,fields:Object
 await writeFile(fixture+'/cargo-target.js',`export const cargoTarget=${JSON.stringify(cargo)},itemTarget=${JSON.stringify(item)},searchTarget=null,commonTarget=null,followupTarget=null;`);
 const manifest=JSON.parse(await readFile(fixture+'/manifest.json'));manifest.host_permissions=manifest.optional_host_permissions;await writeFile(fixture+'/manifest.json',JSON.stringify(manifest));
 const context=await chromium.launchPersistentContext('/tmp/vision-simple-'+Date.now(),{executablePath:process.env.VISION_TEST_BROWSER||'/tmp/vision-playwright/chromium-1234/chrome-linux64/chrome',headless:true,ignoreDefaultArgs:['--disable-extensions'],args:['--no-sandbox','--load-extension='+fixture],viewport:{width:600,height:720}});
+const observed=JSON.parse(await readFile(new URL('./fixtures/cargo-popup-observed.json',import.meta.url)));
 const errors=[],checks=[];context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
 try{
  await context.route('https://unipass.customs.go.kr/**',r=>r.fulfill({contentType:'text/html',body:'<body></body>'}));
@@ -32,9 +33,9 @@ try{
  checks.push('changed declaration still stops before writes');
  // A correctly identified already-open cargo popup is reused; no new popup.
  await page.goto(base+'cargo-workflow.html?tab=10');await page.locator('#start-cargo').waitFor();
- await page.evaluate(()=>{
+ await page.evaluate(observed=>{
   window.calls=[];window.selected=false;window.applied=false;
-  chrome.tabs.query=async()=>[{id:10,url:'https://unipass.customs.go.kr/csp/index.do'}, {id:20,openerTabId:10,url:'https://unipass.customs.go.kr/csp/myc/comm/CommCdCtr/openMYC0801008Q.do'}];
+  chrome.tabs.query=async()=>[{id:10,url:'https://unipass.customs.go.kr/csp/index.do'}, {...observed.popup,url:'https://unipass.customs.go.kr'+observed.popup.path}];
   chrome.tabs.get=async()=>({id:10,windowId:1});chrome.tabs.update=async()=>{};chrome.windows.update=async()=>{};
   chrome.scripting.executeScript=async req=>{const a=req.args[0];window.calls.push({action:a.action,reuse:a.reuse_popup,id:req.target.tabId});let result;
    if(req.func.name==='itemCommitStep'){
@@ -49,10 +50,22 @@ try{
    }
    return [{frameId:0,result}];
   };
- });
+ },observed);
  await page.locator('#start-cargo').click();await page.waitForFunction(()=>!document.getElementById('start-cargo').disabled);
  const calls=await page.evaluate(()=>window.calls);assert.equal(calls.filter(x=>x.action==='open_popup').length,1);assert.equal(calls.find(x=>x.action==='open_popup').reuse,true);assert.equal(calls.find(x=>x.action==='popup_search').id,20);assert.equal(calls.filter(x=>x.action==='apply').length,1);
- checks.push('observed comm popup path is found, existing same-opener popup reused, and entry continues in one run');
+ checks.push('exact exported popup path is found, existing same-opener popup reused, and entry continues in one run');
+ // Resume the precise stopped stage from 1.0.7 without opening another popup.
+ await page.evaluate(async cargo=>{
+  window.calls=[];window.selected=false;window.applied=false;
+  const fingerprint=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(cargo))))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  await chrome.storage.local.set({visionCargoAttemptV1:{target:10,fingerprint,token:'paused107',stage:'popup_requested',before:[10]}});
+  const original=chrome.scripting.executeScript;
+  chrome.scripting.executeScript=async req=>req.func.name==='cargoStep'&&req.args[0].action==='begin'?[{frameId:0,result:{status:'existing',stage:'popup_requested',token:'paused107'}}]:original(req);
+ },cargo);
+ await page.locator('#start-cargo').click();await page.waitForFunction(()=>!document.getElementById('start-cargo').disabled);
+ const resumed=await page.evaluate(()=>window.calls);assert.equal(resumed.filter(x=>x.action==='open_popup').length,0);assert.equal(resumed.filter(x=>x.action==='popup_search').length,1);assert.equal(resumed.find(x=>x.action==='popup_search').id,20);
+ checks.push('stopped 1.0.7 popup_requested record resumes the already-open popup without opening another');
+
  // Real injected item DOM and guards, not controller stubs.
  const form=await context.newPage();await form.goto('https://unipass.customs.go.kr/csp/index.do');
  await form.evaluate(({item})=>{
@@ -75,10 +88,19 @@ try{
  await form.locator('#CSW0101001S_prlstTbl tr').first().locator('td').nth(1).evaluate(e=>e.textContent='OTHER-CARGO');
  result=await form.evaluate(itemCommitStep,{action:'review',job:item,token:'other-cargo'});assert.equal(result.can_repair,false);assert.equal(await form.evaluate(()=>window.clicks),1);
  checks.push('different nonempty cargo is never silently overwritten');
- const popup=await context.newPage();await popup.goto('https://unipass.customs.go.kr/csp/myc/comm/CommCdCtr/openMYC0801008Q.do');
+ const popup=await context.newPage();await popup.goto('https://unipass.customs.go.kr'+observed.popup.path);
  await popup.setContent('<input id="MYC0801008Q_reqForm" value="CSW0101001S_cargMtNoPrlst|CSW0101001S_blNoCn"><table id="MYC0801008Q_result"></table>');
  result=await popup.evaluate(cargoStep,{action:'popup_ready',job:cargo,token:'cargo'});assert.equal(result.status,'ready');
- await popup.goto('https://unipass.customs.go.kr/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do');result=await popup.evaluate(cargoStep,{action:'popup_ready',job:cargo,token:'cargo'});assert.equal(result.status,'blocked');checks.push('injected cargo reader accepts observed comm URL and rejects typo endpoint');
+ await popup.evaluate(()=>{
+  document.body.insertAdjacentHTML('beforeend','<select id="MYC0801008Q_qryTp"><option value="1">화물관리번호</option><option value="2">M B/L - H B/L</option></select><input type="text" id="MYC0801008Q_mblNo"><input type="text" id="MYC0801008Q_hblNo"><select id="MYC0801008Q_year"><option value="2025">2025년</option><option value="2026">2026년</option></select><button id="MYC0801008Q_searchBtn">조회</button>');
+  window.searchClicks=0;document.getElementById('MYC0801008Q_searchBtn').onclick=()=>window.searchClicks++;
+ });
+ result=await popup.evaluate(cargoStep,{action:'popup_search',job:cargo,token:'cargo'});assert.equal(result.status,'searched');
+ assert.equal(await popup.locator('#MYC0801008Q_hblNo').inputValue(),cargo.cargo.hbl);assert.equal(await popup.locator('#MYC0801008Q_year').inputValue(),'2026');assert.equal(await popup.locator('#MYC0801008Q_qryTp').inputValue(),'2');assert.equal(await popup.evaluate(()=>window.searchClicks),1);
+ for(const wrong of ['/csp/myc/comm/CommCdCtr/openMYC0801008Q.do','/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do']){
+  await popup.goto('https://unipass.customs.go.kr'+wrong);result=await popup.evaluate(cargoStep,{action:'popup_ready',job:cargo,token:'cargo'});assert.equal(result.status,'blocked');
+ }
+ checks.push('exported comn/ComnCdCtr path accepts actual injected search: HBL and year populated and query clicked once; guessed paths rejected');
  // Fixed attachment areas accept exact user categories and PDF originals.
  await page.goto(base+'cargo-workflow.html?tab=10&autorun=1');await page.locator('#photo-drop-label').waitFor();
  assert.equal(await page.locator('#start-cargo').isEnabled(),true);
@@ -113,7 +135,7 @@ try{
  await mkdir(new URL('../artifacts/screenshots',import.meta.url),{recursive:true});
  await page.screenshot({path:new URL('../artifacts/screenshots/12-simple-input.png',import.meta.url).pathname,fullPage:true});
  await page.setViewportSize({width:390,height:720});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
- await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));assert.equal(await page.locator('.app-version').textContent(),'v1.0.7');assert.match(await page.title(),/v1.0.7/);
+ await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));assert.equal(await page.locator('.app-version').textContent(),'v1.0.8');assert.match(await page.title(),/v1.0.8/);
  await page.screenshot({path:new URL('../artifacts/screenshots/11-compact-home.png',import.meta.url).pathname});
  await page.setViewportSize({width:1000,height:900});
  const resized=await page.evaluate(async()=>{const {sizeAssistWindow}=await import('./assist-window.js');const updates=[];chrome.windows.update=async(id,value)=>updates.push(value);chrome.windows.getCurrent=async()=>({id:1,type:'normal',state:'normal',left:0,top:0});await sizeAssistWindow(true);const normal=updates.length;chrome.windows.getCurrent=async()=>({id:2,type:'popup',state:'normal',left:0,top:0});await sizeAssistWindow(true);await sizeAssistWindow(false);return {normal,updates};});
