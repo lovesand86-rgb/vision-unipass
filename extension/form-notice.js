@@ -29,6 +29,9 @@ export async function formNoticeStep(request) {
     const rendered=n=>{
       if(n.nodeType===Node.TEXT_NODE)return n.parentElement&&visible(n.parentElement)?n.textContent:'';
       if(n.nodeType!==Node.ELEMENT_NODE||!visible(n)||n.matches('script,style,option'))return '';
+      // jQuery UI's close button can render a literal 'close' icon label.
+      // Exclude only a close control, never a matching word in notice prose.
+      if(n.matches('button,a,[role=button]')&&/^(close|닫기|[×✕✖xX])$/i.test(compact(n.innerText||n.value)))return '';
       if(n.matches('textarea'))return n.value;
       if(n.matches('input'))return ['button','submit'].includes(n.type)?n.value:'';
       return [...n.childNodes].map(rendered).join(' ');
@@ -58,8 +61,7 @@ export async function formNoticeStep(request) {
     stable();if(request.action==='open'&&!visible(table))fail(def.tabText+' 탭이 열리지 않았습니다.');const root=find();
     if(!root)return {status:'ready',notice:'absent'};
     const button=[...root.querySelectorAll('button,a,input[type=button],input[type=submit]')].find(n=>visible(n)&&!n.disabled&&compact(n.innerText||n.value)==='확인');
-    const check=[...root.querySelectorAll('input[type=checkbox]')].find(visible);
-    if(check.checked)fail(def.title+'의 오늘 하루 그만보기 선택 상태를 확인해 주세요.');
+    // Preserve the user's current '오늘 하루 그만보기' selection.
     if(root.dataset.visionNoticeAttempt==='requested'||root.dataset.visionAttachmentNotice==='requested')fail(def.title+' 확인 이후 닫힘을 확인하지 못했습니다. 자동 재클릭하지 않습니다.');
     stable();root.dataset.visionNoticeAttempt='requested';button.click();
     for(let n=0;n<20;n++){

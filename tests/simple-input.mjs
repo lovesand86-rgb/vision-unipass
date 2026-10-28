@@ -135,7 +135,7 @@ try{
  await mkdir(new URL('../artifacts/screenshots',import.meta.url),{recursive:true});
  await page.screenshot({path:new URL('../artifacts/screenshots/12-simple-input.png',import.meta.url).pathname,fullPage:true});
  await page.setViewportSize({width:390,height:720});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
- await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));assert.equal(await page.locator('.app-version').textContent(),'v1.0.8');assert.match(await page.title(),/v1.0.8/);
+ await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));assert.equal(await page.locator('.app-version').textContent(),'v'+manifest.version);assert.ok((await page.title()).endsWith('v'+manifest.version));
  await page.screenshot({path:new URL('../artifacts/screenshots/11-compact-home.png',import.meta.url).pathname});
  await page.setViewportSize({width:1000,height:900});
  const resized=await page.evaluate(async()=>{const {sizeAssistWindow}=await import('./assist-window.js');const updates=[];chrome.windows.update=async(id,value)=>updates.push(value);chrome.windows.getCurrent=async()=>({id:1,type:'normal',state:'normal',left:0,top:0});await sizeAssistWindow(true);const normal=updates.length;chrome.windows.getCurrent=async()=>({id:2,type:'popup',state:'normal',left:0,top:0});await sizeAssistWindow(true);await sizeAssistWindow(false);return {normal,updates};});
