@@ -26,8 +26,8 @@ const refresh = () => {
   $('list-target').disabled = working;
   $('start-copy').disabled = working || !job || !$('list-target').value;
   $('check-copy').disabled = working || !job;
-  $('closed-draft-ack').disabled = working;
-  $('close-attempt').disabled = working || !job || !$('closed-draft-ack').checked;
+  $('close-attempt').disabled = working || !job;
+  load().then(a=>{$('close-attempt').hidden=!a||!['copy_requested','copy_unknown','copy_verified'].includes(a.stage);}).catch(()=>{});
   $('start-sequence').disabled=working||!job;
   $('start-sequence').textContent=working?'진행 중…':'시작하기';
 };
@@ -96,7 +96,6 @@ const showDraft = async (attempt, tab) => {
 };
 $('workflow-job').addEventListener('change', async () => {
   job = null;
-  $('closed-draft-ack').checked = false;
   $('list-choice').hidden=true;
   $('list-target').replaceChildren(new Option('처리현황을 찾아주세요', ''));
   $('job-summary').textContent = '';
@@ -212,7 +211,7 @@ async function lockedRun(checkOnly,chain=false,resumeOnly=false) {
   } catch (error) { log(error.message || '확인할 수 없는 오류로 중단했습니다.'); }
   finally { busy = false; refresh(); }
   // The shared lock and notice debugger have been released before handoff.
-  if(handoff!==null)continueInTool('cargo-workflow.html?tab='+handoff+'&autorun=1');
+  if(handoff!==null)continueInTool('cargo-workflow.html?tab='+handoff);
   return needsList;
 }
 $('start-sequence').addEventListener('click',async()=>{
@@ -220,7 +219,7 @@ $('start-sequence').addEventListener('click',async()=>{
   starting=true;refresh();
   try{
     // Request while the click gesture is active, before reading saved state.
-    if(!await chrome.permissions.request({origins:[origin]}))throw Error('UNI-PASS 화면 연결을 허용해주세요.');
+    if(!await chrome.permissions.contains({origins:[origin]})&&!await chrome.permissions.request({origins:[origin]}))throw Error('UNI-PASS 화면 연결을 허용해주세요.');
     const attempt=await load();
     if(attempt&&attempt.fingerprint===await digest()&&['copy_requested','copy_unknown','copy_verified'].includes(attempt.stage)){
       await lockedRun(true,canChain());return;
@@ -234,15 +233,15 @@ $('start-sequence').addEventListener('click',async()=>{
 });
 $('start-copy').addEventListener('click', () => lockedRun(false));
 $('check-copy').addEventListener('click', () => lockedRun(true));
-$('closed-draft-ack').addEventListener('change', refresh);
 $('close-attempt').addEventListener('click', async () => {
-  if (busy || !job || !$('closed-draft-ack').checked) return;
+  if (busy || starting || !job) return;
+  let cleared=false;
   busy = true; refresh();
   try {
     await navigator.locks.request('vision-unipass-search-copy', {ifAvailable: true}, async lock => {
       if (!lock) throw new Error('다른 도구 창에서 진행 중입니다.');
       const attempt = await load();
-      if (!attempt || attempt.fingerprint !== await digest() ||
+      if (!attempt ||
           !['copy_requested', 'copy_unknown', 'copy_verified'].includes(attempt.stage)) {
         throw new Error('선택한 작업 파일의 종료 가능한 복사 기록이 없습니다.');
       }
@@ -253,19 +252,19 @@ $('close-attempt').addEventListener('click', async () => {
       for (const tab of openTabs) {
         const result = await invoke(tab.id, 'draft_presence');
         if (result.status !== 'no_draft') {
-          throw new Error(`탭 ${tab.id}에 신청서 작성 화면이 열려 있습니다. 해당 화면의 저장 여부를 먼저 확인해 주세요. 작업 기록은 유지했습니다.`);
+          throw new Error('이전 신청서가 아직 열려 있습니다. 유니패스에서 작업을 마치고 처리현황으로 돌아온 뒤 다시 눌러주세요.');
         }
       }
       // Preserve the old attempt for diagnosis. No website click or new copy
       // occurs until the user explicitly starts search/copy again.
       const closed = {...attempt, stage: 'closed_by_user', previousStage: attempt.stage,
-        closedAt: new Date().toISOString(), closure: 'user_confirmed_closed_without_save_or_submit'};
+        closedAt: new Date().toISOString(), closure: 'user_requested_next_job_no_open_draft'};
       await chrome.storage.local.set({[key]: closed, visionLastClosedCopyAttemptV1: closed});
-      $('closed-draft-ack').checked = false;
-      log('닫은 작업을 정리했습니다. 시작하기를 누르세요.');
+      cleared=true;log('이전 작업 기록을 보관했습니다. 다음 건을 시작합니다.');
     });
-  } catch (error) { log(error.message || '작업을 종료하지 못했습니다. 이전 기록을 유지합니다.'); }
+  } catch (error) { status(error.message || '이전 작업 기록을 유지했습니다.'); }
   finally { busy = false; refresh(); }
+  if(cleared)$('start-sequence').click();
 });
 showJob();
 refresh();

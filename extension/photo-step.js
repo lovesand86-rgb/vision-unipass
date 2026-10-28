@@ -58,7 +58,7 @@ export async function photoStep(request) {
     const stillBound=()=>{
       targetBound();if(!input.isConnected)fail('사진 확인 중 첨부 대상 신고서가 바뀌었습니다.');
     };
-    if(!meta||!Number.isInteger(meta.size)||meta.size<1||meta.size>5000000||!/^.{1,200}\.(png|jpg|jpeg|bmp|gif|tif|pdf)$/i.test(meta.name)||/[\\/\u0000-\u001f]/.test(meta.name)||!/^[a-f0-9]{64}$/.test(meta.sha256))fail('사진 파일 이름·크기·해시를 확인해 주세요. 파일당 5MB 이하만 지원합니다.');
+    if(!meta||!Number.isInteger(meta.size)||meta.size<1||meta.size>5000000||!/^.{1,200}\.(png|jpg|jpeg|bmp|gif|tiff?|pdf)$/i.test(meta.name)||/[\\/\u0000-\u001f]/.test(meta.name)||!/^[a-f0-9]{64}$/.test(meta.sha256))fail('사진 파일 이름·크기·해시를 확인해 주세요. 파일당 5MB 이하만 지원합니다.');
     const hash=async buffer=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',buffer))].map(v=>v.toString(16).padStart(2,'0')).join('');
     const selected=async()=>input.files.length===1&&input.files[0].size===meta.size&&await hash(await input.files[0].arrayBuffer())===meta.sha256;
     const marker='visionAttachment'+slot;

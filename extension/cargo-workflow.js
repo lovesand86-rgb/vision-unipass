@@ -12,7 +12,7 @@ import {createFinalActions} from './final-controller.js';
 const {cargoTarget,itemTarget,commonTarget,followupTarget}=targets;
 const $ = id => document.getElementById(id);
 const target = Number(new URL(location.href).searchParams.get('tab'));
-const popupPath = '/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do';
+const popupPaths = ['/csp/myc/comm/CommCdCtr/openMYC0801008Q.do','/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do'];
 const key = 'visionCargoAttemptV1';
 let job = cargoTarget, busy = false, contactSnapshot=null, activeStage='item', itemRepair=null, finalActions=null,lastError='';
 const phaseNames={item:'품목·화물',common:'공통사항',shipment:'선적일',entry:'반입일',contact:'연락처',warehouse:'창고·기관',product:'제품상태',photos:'사진'};
@@ -37,7 +37,7 @@ const summary = () => {
   $('cargo-status').textContent='시작하면 준비된 값을 입력합니다.';refresh();
 };
 const tabs = () => chrome.tabs.query({url:'https://unipass.customs.go.kr/*'});
-const isPopup = tab => { try { return new URL(tab.url).pathname === popupPath; } catch { return false; } };
+const isPopup = tab => { try { return popupPaths.includes(new URL(tab.url).pathname); } catch { return false; } };
 const fingerprint = async () => [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(job))))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const save = record => chrome.storage.local.set({[key]:record});
 const call = async (tabId, action, token, extra={}, func=cargoStep, payload=job, timeout=15000) => {
@@ -252,7 +252,7 @@ $('export-progress').addEventListener('click',async()=>{
     let diagnostics;
     try{diagnostics=await invokeCommon(followupStep,{action:'diagnostics'});}catch(error){diagnostics={error:error.message};}
     const report={format:'vision-unipass-progress',version:1,created_at:new Date().toISOString(),tool:'VISION ASSIST · 실적 기반 입력',app_version:chrome.runtime.getManifest().version,
-      browser:{target_tab:target,popups:(await tabs()).filter(t=>isPopup(t)||t.url?.includes('openCSW0302065Q.do')).map(t=>({id:t.id,opener_tab:t.openerTabId,path:new URL(t.url).pathname}))},
+      browser:{target_tab:target,popups:(await tabs()).filter(t=>t.id!==target).flatMap(t=>{try{return [{id:t.id,opener_tab:t.openerTabId,path:new URL(t.url).pathname}];}catch{return [];}})},
       stages:Object.fromEntries(['item','common','shipment','entry','contact','warehouse','product','label','photos'].map(k=>[k,$('stage-'+k).textContent])),
       log:[...$('cargo-log').children].map(n=>n.textContent),final_actions:finalActions?.report(),diagnostics};
     const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
@@ -331,10 +331,4 @@ $('sequence-save-contact').addEventListener('click',async()=>{
   });}catch(error){log(error.message);}finally{busy=false;refresh();}
   if(saved)await run();
 });
-// Only the search workflow's explicit start uses this one-time handoff.
-if(new URL(location.href).searchParams.get('autorun')==='1'){
-  history.replaceState(null,'',location.pathname+'?tab='+target);
-  run();
-}
-
 guardToolNavigation(()=>busy);

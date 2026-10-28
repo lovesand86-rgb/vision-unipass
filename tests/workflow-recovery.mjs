@@ -52,6 +52,20 @@ const select='<select id="reqApreIttCd"><option>식품의약품안전처</option
 await form.setContent(baseHtml+select+'<div hidden>'+select+'</div>');result=await form.evaluate(declarationStep,{action:'probe',job});assert.equal(result.list,true);
 await form.setContent(baseHtml+select+select);result=await form.evaluate(declarationStep,{action:'probe',job});assert.equal(result.list,false);
 await form.setContent(baseHtml+'<div hidden>'+select+'</div>');result=await form.evaluate(declarationStep,{action:'probe',job});assert.equal(result.list,false);
+// Next-job action archives only after every accessible page has no open draft.
+await setup('copy_unknown','next');
+page.on('dialog',dialog=>dialog.accept());
+await page.evaluate(()=>{
+ chrome.tabs.query=async()=>[{id:1,url:'https://unipass.customs.go.kr/csp/index.do'}];
+ chrome.scripting.executeScript=async({args})=>{window.calls.push({action:args[0].action});return [{frameId:0,result:{status:'draft_present'}}];};
+});
+await page.evaluate(()=>document.getElementById('close-attempt').hidden=false);await page.locator('#close-attempt').click();await page.waitForFunction(()=>!document.getElementById('close-attempt').disabled);
+assert.equal(await page.evaluate(()=>chrome.storage.local.get('visionCopyAttemptV1').then(x=>x.visionCopyAttemptV1.stage)),'copy_unknown');
+await page.evaluate(()=>{chrome.scripting.executeScript=async({args})=>{window.calls.push({action:args[0].action});return [{frameId:0,result:args[0].action==='draft_presence'?{status:'no_draft'}:{list:false}}];};});
+await page.evaluate(()=>document.getElementById('close-attempt').hidden=false);await page.locator('#close-attempt').click();await page.waitForFunction(()=>document.getElementById('workflow-log').textContent.includes('이전 작업 기록을 보관'));
+assert.equal(await page.evaluate(()=>chrome.storage.local.get('visionLastClosedCopyAttemptV1').then(x=>x.visionLastClosedCopyAttemptV1.previousStage)),'copy_unknown');
+assert.ok(await page.evaluate(()=>window.calls.some(x=>x.action==='probe')));
+assert.equal(await page.locator('#closed-draft-ack').count(),0);
 // Exercise search/result on a real synthetic DOM, including hidden duplicate IDs.
 const fields=['qryStrtDt','qryEndDt','owrEntsConm','reqRqstNo','reqRqstAcapNo','reqIttApreNo','prlstCdCn','blNoCn','cargMtNo','ovrsEntsConm','aplcUserId','reqUserId','dcerSgn'];
 await form.setContent(baseHtml+select+'<input type="checkbox" id="excelCheck"><select id="reqRqstPrcsSttsClsfCd"><option value="">전체</option></select>'+fields.map(id=>`<input type="text" id="${id}">`).join('')+'<div hidden>'+select+'<button id="btnQry">조회</button><table id="qryTbl1"></table></div>');
@@ -59,5 +73,5 @@ await form.evaluate(({job})=>{window.queryClicks=0;document.querySelector('#btnQ
 result=await form.evaluate(declarationStep,{action:'search',token:'synthetic',job});assert.equal(result.status,'query_requested');assert.equal(await form.evaluate(()=>window.queryClicks),1);
 await form.waitForFunction(()=>window.__visionSearchState?.changed&&Date.now()-window.__visionSearchState.lastChange>=650);
 result=await form.evaluate(declarationStep,{action:'result',token:'synthetic',job});assert.equal(result.status,'matched');
-assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,checks:['invalid/missing tab URLs ignored','loading original retried','lost open response recovered','legacy searching stage resumes original','original_requested resumes original','copy_unknown never recopied','duplicate originals blocked','mismatched originals blocked','missing agency blocked before writes','hidden duplicate tolerated','two visible agencies rejected','hidden-only agency rejected','search and result use visible controls with hidden duplicates'],pageErrors:errors},null,2));
+assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,checks:['next job preserves open drafts and archives closed work before starting','invalid/missing tab URLs ignored','loading original retried','lost open response recovered','legacy searching stage resumes original','original_requested resumes original','copy_unknown never recopied','duplicate originals blocked','mismatched originals blocked','missing agency blocked before writes','hidden duplicate tolerated','two visible agencies rejected','hidden-only agency rejected','search and result use visible controls with hidden duplicates'],pageErrors:errors},null,2));
 }finally{await context.close();await rm(fixture,{recursive:true,force:true});}

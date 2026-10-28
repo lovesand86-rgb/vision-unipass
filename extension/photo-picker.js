@@ -1,52 +1,56 @@
-const allowed=/\.(png|jpe?g|bmp|gif|tif|pdf)$/i;
-export function photoRole(name){
- const label=/한글|표시|label/i.test(name),front=/전면|정면|front/i.test(name);
- return label!==front?(label?'label':'front'):'other';
-}
+const allowed=/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i;
+// Kept for older imports; fixed attachment areas no longer infer roles from names.
+export function photoRole(name){const label=/한글|표시|label/i.test(name),front=/전면|정면|front/i.test(name);return label!==front?(label?'label':'front'):'other';}
 export function createPhotoPicker(root,onChange=()=>{}){
- let items=[],busy=false;
- root.innerHTML='<button type="button" class="photo-drop" id="photo-drop"><span>＋</span><strong>사진을 놓거나 눌러서 선택</strong><small>여러 장을 한 번에 넣을 수 있어요</small></button><input id="photo-files" class="sr-only" tabindex="-1" type="file" multiple accept=".png,.jpg,.jpeg,.bmp,.gif,.tif,.pdf"><p id="photo-hint" class="photo-hint" role="status"></p><div id="photo-list" class="photo-list"></div>';
- const input=root.querySelector('input'),drop=root.querySelector('.photo-drop'),list=root.querySelector('.photo-list'),hint=root.querySelector('.photo-hint');
- const notify=message=>{hint.textContent=message;};
+ let busy=false;
+ const groups=[{role:'label',title:'한글표시사항',limit:1,items:[]},{role:'front',title:'제품 전면',limit:1,items:[]},{role:'other',title:'기타 사진·서류',limit:9,items:[]}];
+ root.replaceChildren();
+ const hint=document.createElement('p');hint.id='photo-hint';hint.className='photo-hint';hint.setAttribute('role','status');
+ const notify=s=>{hint.textContent=s;};
+ const count=()=>groups.reduce((n,g)=>n+g.items.length,0);
+ // Attachments are optional; each provided file already has an explicit slot.
+ const ready=()=>count()>0;
+ for(const g of groups){
+  const section=document.createElement('section');section.className='photo-section';section.dataset.role=g.role;
+  const title=document.createElement('h3');title.textContent=g.title+' · '+(g.limit===1?'1개':'최대 9개');section.append(title);
+  const drop=document.createElement('button');drop.type='button';drop.className='photo-drop';drop.id='photo-drop-'+g.role;drop.textContent='＋ 끌어놓거나 눌러서 선택';drop.setAttribute('aria-label',g.title+' 파일 선택');
+  const input=document.createElement('input');input.type='file';input.id='photo-files-'+g.role;input.className='sr-only';input.tabIndex=-1;input.multiple=g.limit>1;input.accept='.png,.jpg,.jpeg,.bmp,.gif,.tif,.tiff,.pdf';
+  const list=document.createElement('div');list.className='photo-list';section.append(drop,input,list);root.append(section);
+  Object.assign(g,{drop,input,list});
+  drop.onclick=()=>{if(!busy)input.click();};input.onchange=()=>{add(g,input.files);input.value='';};
+  for(const event of ['dragover','drop'])section.addEventListener(event,e=>{e.preventDefault();e.stopPropagation();if(busy)return;if(event==='dragover'){drop.classList.add('dragging');e.dataTransfer.dropEffect='copy';}else{drop.classList.remove('dragging');add(g,e.dataTransfer.files);}});
+  section.addEventListener('dragleave',e=>{if(!section.contains(e.relatedTarget))drop.classList.remove('dragging');});
+ }
+ root.append(hint);
  function render(){
-  list.replaceChildren();
-  for(const [i,item]of items.entries()){
-   const card=document.createElement('div');card.className='photo-card';
-   if(item.url){const img=document.createElement('img');img.src=item.url;img.alt=item.file.name;card.append(img);}else{const icon=document.createElement('span');icon.className='photo-icon';icon.textContent='파일';card.append(icon);}
-   const name=document.createElement('span');name.className='photo-name';name.textContent=item.file.name;card.append(name);
-   const select=document.createElement('select');select.setAttribute('aria-label',item.file.name+' 사진 종류');
-   for(const [value,label]of [['label','한글표시'],['front','제품 전면'],['other','기타 사진']])select.append(new Option(label,value));select.value=item.role;select.disabled=busy;
-   select.onchange=()=>{if(busy)return;if(select.value!=='other')for(const other of items)if(other!==item&&other.role===select.value)other.role='other';item.role=select.value;render();onChange();};card.append(select);
-   const actions=document.createElement('div');actions.className='photo-actions';
-   for(const [label,delta]of [['앞으로',-1],['뒤로',1]]){
-    const b=document.createElement('button');b.type='button';b.textContent=delta<0?'←':'→';b.setAttribute('aria-label',item.file.name+' '+label);b.disabled=busy||i+delta<0||i+delta>=items.length;
-    b.onclick=()=>{if(busy)return;[items[i],items[i+delta]]=[items[i+delta],items[i]];render();onChange();};actions.append(b);
+  for(const g of groups){
+   g.drop.disabled=g.input.disabled=busy;g.list.replaceChildren();
+   g.drop.textContent=g.limit===1&&g.items.length?'파일 바꾸기':'＋ 끌어놓거나 눌러서 선택';
+   for(const [i,item]of g.items.entries()){
+    const card=document.createElement('div');card.className='photo-card';
+    if(item.url){const img=document.createElement('img');img.src=item.url;img.alt=item.file.name;card.append(img);}else{const icon=document.createElement('span');icon.className='photo-icon';icon.textContent=/\.pdf$/i.test(item.file.name)?'PDF':'이미지';card.append(icon);}
+    const name=document.createElement('span');name.className='photo-name';name.textContent=item.file.name;card.append(name);
+    const actions=document.createElement('div');actions.className='photo-actions';
+    if(g.limit>1)for(const [label,delta]of [['앞으로',-1],['뒤로',1]]){
+     const b=document.createElement('button');b.type='button';b.textContent=delta<0?'←':'→';b.setAttribute('aria-label',item.file.name+' '+label);b.disabled=busy||i+delta<0||i+delta>=g.items.length;
+     b.onclick=()=>{if(busy)return;[g.items[i],g.items[i+delta]]=[g.items[i+delta],g.items[i]];render();onChange();};actions.append(b);
+    }
+    const remove=document.createElement('button');remove.type='button';remove.textContent='삭제';remove.setAttribute('aria-label',item.file.name+' 삭제');remove.disabled=busy;remove.onclick=()=>{if(busy)return;if(item.url)URL.revokeObjectURL(item.url);g.items=g.items.filter(x=>x!==item);render();onChange();};actions.append(remove);card.append(actions);g.list.append(card);
    }
-   const remove=document.createElement('button');remove.type='button';remove.textContent='삭제';remove.setAttribute('aria-label',item.file.name+' 삭제');remove.disabled=busy;remove.onclick=()=>{if(busy)return;if(item.url)URL.revokeObjectURL(item.url);items=items.filter(x=>x!==item);render();onChange();};actions.append(remove);card.append(actions);list.append(card);
   }
-  drop.disabled=busy;input.disabled=busy;
-  notify(!items.length?'파일당 5MB · 최대 11장':ready()?`${items.length}장 준비됨 · 입력할 때 함께 첨부합니다.`:'미리보기에서 한글표시와 제품 전면을 골라주세요.');
+  notify(count()?`${count()}개 준비됨 · 입력할 때 함께 첨부합니다.`:'이미지·PDF · 파일당 5MB');
  }
- function add(files){
-  if(busy)return;
-  const incoming=[...files].filter(f=>!items.some(x=>x.file.name===f.name&&x.file.size===f.size&&x.file.lastModified===f.lastModified));
-  const unique=incoming.filter((f,i)=>incoming.findIndex(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified)===i);
-  if(items.length+unique.length>11){notify('사진은 최대 11장까지 넣을 수 있습니다.');return;}
-  const bad=unique.find(f=>!allowed.test(f.name)||!f.size||f.size>5000000);if(bad){notify(bad.name+' · 지원 형식과 5MB 제한을 확인해주세요.');return;}
-  unique.sort((a,b)=>a.name.localeCompare(b.name,'ko',{numeric:true}));
-  const next=unique.map(file=>({file,role:photoRole(file.name),url:/\.(png|jpe?g|bmp|gif)$/i.test(file.name)?URL.createObjectURL(file):null}));
-  for(const role of ['label','front'])if(items.some(x=>x.role===role)||next.filter(x=>x.role===role).length>1)for(const item of next)if(item.role===role)item.role='other';
-  items.push(...next);render();onChange();
+ function add(g,files){
+  if(busy)return;const incoming=[...files];
+  if(!incoming.length)return;
+  if(g.limit===1&&incoming.length>1){notify(g.title+'은 1개만 넣어주세요.');return;}
+  const bad=incoming.find(f=>!allowed.test(f.name)||!f.size||f.size>5000000);if(bad){notify(bad.name+' · 이미지 또는 PDF, 5MB 이하만 넣어주세요.');return;}
+  const unique=incoming.filter((f,i)=>incoming.findIndex(x=>x.name===f.name&&x.size===f.size&&x.lastModified===f.lastModified)===i).filter(f=>g.limit===1||!g.items.some(x=>x.file.name===f.name&&x.file.size===f.size&&x.file.lastModified===f.lastModified));
+  if(g.limit>1&&g.items.length+unique.length>g.limit){notify('기타 사진·서류는 최대 9개입니다.');return;}
+  if(g.limit===1){for(const item of g.items)if(item.url)URL.revokeObjectURL(item.url);g.items=[];}
+  g.items.push(...unique.map(file=>({file,url:/\.(png|jpe?g|bmp|gif)$/i.test(file.name)?URL.createObjectURL(file):null})));
+  render();onChange();
  }
- function ready(){return items.some(x=>x.role==='label')&&items.some(x=>x.role==='front')&&items.filter(x=>x.role==='other').length<=9;}
- drop.onclick=()=>{if(!busy)input.click();};input.onchange=()=>{add(input.files);input.value='';};
- for(const event of ['dragover','drop'])root.addEventListener(event,e=>{e.preventDefault();e.stopPropagation();if(busy)return;if(event==='dragover'){drop.classList.add('dragging');e.dataTransfer.dropEffect='copy';}else{drop.classList.remove('dragging');add(e.dataTransfer.files);}});
- root.addEventListener('dragleave',e=>{if(!root.contains(e.relatedTarget))drop.classList.remove('dragging');});
- // Dropping outside the picker must not navigate away from selected photos.
  for(const event of ['dragover','drop'])document.addEventListener(event,e=>{if([...e.dataTransfer?.types||[]].includes('Files'))e.preventDefault();});
- render();
- return {ready,count:()=>items.length,setBusy(value){busy=value;render();},files(){
-  if(items.length&&!ready())return [];
-  return items.filter(x=>x.role==='label').map(x=>({slot:0,file:x.file})).concat(items.filter(x=>x.role==='front').map(x=>({slot:9,file:x.file})),items.filter(x=>x.role==='other').map((x,i)=>({slot:10+i,file:x.file})));
- }};
+ render();return {ready,count,setBusy(value){busy=value;render();},files(){return groups.flatMap(g=>g.items.map((x,i)=>({slot:g.role==='label'?0:g.role==='front'?9:10+i,file:x.file})));}};
 }

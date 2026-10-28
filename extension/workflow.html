@@ -9,14 +9,12 @@
 <div id="list-choice" hidden><label for="list-target">어느 화면에서 진행할까요?</label><select id="list-target"><option value="">처리현황을 선택하세요</option></select></div>
 <button id="start-sequence" class="main-action" disabled>시작하기</button>
 <p id="workflow-status" role="status" aria-live="polite" hidden></p>
+<button id="close-attempt" class="secondary" disabled>다음 건 시작</button>
 <details id="more-tools" class="extra-tools"><summary>도움이 필요할 때</summary>
 <button id="find-list" class="secondary" disabled>UNI-PASS 화면 다시 찾기</button>
 <button id="start-copy" class="secondary" disabled>실적 복사만 하기</button>
 <button id="check-copy" class="secondary" disabled>복사 결과 확인</button>
-<details id="closed-draft-help"><summary>저장하지 않고 닫은 작업 정리</summary>
-<p>임시저장하거나 전송한 신청서에는 사용하지 마세요.</p>
-<label class="ack"><input id="closed-draft-ack" type="checkbox">임시저장·전송하지 않고 복사본을 닫았습니다.</label>
-<button id="close-attempt" class="secondary" disabled>닫은 작업 정리</button></details>
+
 <details><summary>자세한 안내</summary><p>시작하기는 실적을 찾아 복사합니다. 품목·화물 정보가 준비되어 있으면 입력까지 이어갑니다. 한글표시는 직접 확인하고, 검증·저장·전송은 다음 화면에서 따로 진행합니다.</p><p>복사 결과가 불확실하면 다시 복사하지 않고 결과만 확인합니다. UNI-PASS에 표시된 다른 알림은 직접 확인해주세요.</p></details>
 <details><summary>진행 기록</summary><ol id="workflow-log"></ol></details>
 </details>

@@ -5,7 +5,7 @@ export async function cargoStep(request) {
     const fail = message => { throw new Error(message); };
     const job = request.job, token = request.token;
     const pre = 'CSW0101001S_', popupPre = 'MYC0801008Q_';
-    const popupPath = '/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do';
+    const popupPaths = ['/csp/myc/comm/CommCdCtr/openMYC0801008Q.do','/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do'];
     const norm = v => String(v ?? '').replace(/\s/g, '').toUpperCase();
     const cargoNorm = v => norm(v).replace(/-/g, '');
     const one = id => { const nodes = document.querySelectorAll('#' + CSS.escape(id)); if (nodes.length !== 1) fail('필드를 하나로 확인하지 못했습니다: ' + id); return nodes[0]; };
@@ -37,7 +37,7 @@ export async function cargoStep(request) {
       if (node.value !== next) fail('선택값이 유지되지 않습니다.');
     };
     if (['popup_ready','popup_search','popup_result','popup_select'].includes(request.action)) {
-      if (location.pathname !== popupPath) fail('화물관리번호 조회창이 아닙니다.');
+      if (!popupPaths.includes(location.pathname)) fail('화물관리번호 조회창이 아닙니다.');
       if (request.action === 'popup_ready' && (document.readyState !== 'complete' || !document.getElementById(popupPre+'reqForm'))) return {status:'waiting'};
       const mapping = value(popupPre + 'reqForm');
       if (mapping.replace(/^\//,'').split('|')[0] !== pre + 'cargMtNoPrlst' || !mapping.replace(/^\//,'').split('|').includes(pre + 'blNoCn')) fail('이 조회창은 신고서 품목의 화물 연결용이 아닙니다.');

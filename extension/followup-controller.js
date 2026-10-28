@@ -123,7 +123,7 @@ export function createFollowup({invoke,log,stage,target,tabId,getPhotos}) {
     if(photos.filter(p=>p.slot>=10).length>9)throw Error('기타 사진은 최대 9개까지 가능합니다.');
     const prepared=[];
     for(const {slot,file} of photos){
-      if(file.size>5000000||file.size<1||! /\.(png|jpg|jpeg|bmp|gif|tif|pdf)$/i.test(file.name))throw Error('사진은 파일당 5MB 이하의 지원 형식이어야 합니다: '+file.name);
+      if(file.size>5000000||file.size<1||! /\.(png|jpg|jpeg|bmp|gif|tiff?|pdf)$/i.test(file.name))throw Error('사진은 파일당 5MB 이하의 지원 형식이어야 합니다: '+file.name);
       prepared.push({slot,file,meta:{name:file.name,size:file.size,type:file.type,lastModified:file.lastModified,sha256:await hash(file)}});
     }
     const existing=(await invokeForm(photoStep,{action:'evidence',binding})).files;

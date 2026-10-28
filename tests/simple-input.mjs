@@ -34,7 +34,7 @@ try{
  await page.goto(base+'cargo-workflow.html?tab=10');await page.locator('#start-cargo').waitFor();
  await page.evaluate(()=>{
   window.calls=[];window.selected=false;window.applied=false;
-  chrome.tabs.query=async()=>[{id:10,url:'https://unipass.customs.go.kr/csp/index.do'}, {id:20,openerTabId:10,url:'https://unipass.customs.go.kr/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do'}];
+  chrome.tabs.query=async()=>[{id:10,url:'https://unipass.customs.go.kr/csp/index.do'}, {id:20,openerTabId:10,url:'https://unipass.customs.go.kr/csp/myc/comm/CommCdCtr/openMYC0801008Q.do'}];
   chrome.tabs.get=async()=>({id:10,windowId:1});chrome.tabs.update=async()=>{};chrome.windows.update=async()=>{};
   chrome.scripting.executeScript=async req=>{const a=req.args[0];window.calls.push({action:a.action,reuse:a.reuse_popup,id:req.target.tabId});let result;
    if(req.func.name==='itemCommitStep'){
@@ -75,22 +75,27 @@ try{
  await form.locator('#CSW0101001S_prlstTbl tr').first().locator('td').nth(1).evaluate(e=>e.textContent='OTHER-CARGO');
  result=await form.evaluate(itemCommitStep,{action:'review',job:item,token:'other-cargo'});assert.equal(result.can_repair,false);assert.equal(await form.evaluate(()=>window.clicks),1);
  checks.push('different nonempty cargo is never silently overwritten');
- const popup=await context.newPage();await popup.goto('https://unipass.customs.go.kr/csp/myc/comm/ComnCdCtr/openMYC0801008Q.do');
+ const popup=await context.newPage();await popup.goto('https://unipass.customs.go.kr/csp/myc/comm/CommCdCtr/openMYC0801008Q.do');
  await popup.setContent('<input id="MYC0801008Q_reqForm" value="CSW0101001S_cargMtNoPrlst|CSW0101001S_blNoCn"><table id="MYC0801008Q_result"></table>');
  result=await popup.evaluate(cargoStep,{action:'popup_ready',job:cargo,token:'cargo'});assert.equal(result.status,'ready');
  await popup.goto('https://unipass.customs.go.kr/csp/myc/comn/ComnCdCtr/openMYC0801008Q.do');result=await popup.evaluate(cargoStep,{action:'popup_ready',job:cargo,token:'cargo'});assert.equal(result.status,'blocked');checks.push('injected cargo reader accepts observed comm URL and rejects typo endpoint');
- // Photo picker with real File objects, role mapping, drag/drop and limits.
- await page.goto(base+'cargo-workflow.html?tab=10');await page.locator('#photo-drop').waitFor();
+ // Fixed attachment areas accept exact user categories and PDF originals.
+ await page.goto(base+'cargo-workflow.html?tab=10&autorun=1');await page.locator('#photo-drop-label').waitFor();
+ assert.equal(await page.locator('#start-cargo').isEnabled(),true);
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aJr8AAAAASUVORK5CYII=','base64');
- await page.locator('#photo-files').setInputFiles(['01_한글표시.png','02_전면.png','10_기타.png'].map(name=>({name,mimeType:'image/png',buffer:png})));
- const startBox=await page.locator('#start-cargo').boundingBox();assert.ok(startBox.y+startBox.height<=720,'start must stay visible after selecting photos');
- assert.equal(await page.locator('.photo-card').count(),3);assert.match(await page.locator('#photo-hint').textContent(),/3장 준비됨/);
- await page.evaluate(async()=>{const {createPhotoPicker}=await import('./photo-picker.js');const root=document.createElement('div');root.id='test-picker';document.body.append(root);window.picker=createPhotoPicker(root);const dt=new DataTransfer();for(const name of ['1_label.png','2_front.png','10_other.png','3_other.png'])dt.items.add(new File(['test'],name,{type:'image/png'}));root.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));});
- assert.deepEqual(await page.evaluate(()=>window.picker.files().map(x=>[x.slot,x.file.name])),[[0,'1_label.png'],[9,'2_front.png'],[10,'3_other.png'],[11,'10_other.png']]);
+ for(const [role,name]of [['label','01.png'],['front','02.png'],['other','03.pdf']])await page.locator('#photo-files-'+role).setInputFiles({name,mimeType:role==='other'?'application/pdf':'image/png',buffer:png});
+ const startBox=await page.locator('#start-cargo').boundingBox();assert.ok(startBox.y+startBox.height<=720);
+ assert.equal(await page.locator('.photo-card').count(),3);assert.match(await page.locator('#photo-hint').textContent(),/3개 준비됨/);
+ await page.evaluate(async()=>{const {createPhotoPicker}=await import('./photo-picker.js');const root=document.createElement('div');root.id='test-picker';document.body.append(root);window.picker=createPhotoPicker(root);for(const [role,names]of [['label',['1_label.png']],['front',['2_front.png']],['other',['3_other.pdf','10_other.png']]]){const dt=new DataTransfer();for(const name of names)dt.items.add(new File(['test'],name));root.querySelector('[data-role='+role+']').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));}});
+ assert.deepEqual(await page.evaluate(()=>window.picker.files().map(x=>[x.slot,x.file.name])),[[0,'1_label.png'],[9,'2_front.png'],[10,'3_other.pdf'],[11,'10_other.png']]);
+ assert.equal(await page.locator('#test-picker select').count(),0);
  await page.locator('#test-picker').getByLabel('10_other.png 앞으로').click();assert.equal(await page.evaluate(()=>window.picker.files().find(x=>x.slot===10).file.name),'10_other.png');
- await page.evaluate(()=>{window.picker.setBusy(true);const dt=new DataTransfer();dt.items.add(new File(['x'],'busy.png'));document.querySelector('#test-picker').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));});assert.equal(await page.evaluate(()=>window.picker.count()),4);
- await page.evaluate(()=>window.picker.setBusy(false));await page.locator('#test-picker').getByLabel('1_label.png 삭제').click();assert.equal(await page.evaluate(()=>window.picker.ready()),false);assert.deepEqual(await page.evaluate(()=>window.picker.files()),[]);
- await page.locator('#test-picker').getByLabel('3_other.png 사진 종류').selectOption('label');assert.equal(await page.evaluate(()=>window.picker.ready()),true);
+ await page.evaluate(()=>{window.picker.setBusy(true);const dt=new DataTransfer();dt.items.add(new File(['x'],'busy.png'));document.querySelector('#test-picker [data-role=other]').dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));});assert.equal(await page.evaluate(()=>window.picker.count()),4);
+ await page.evaluate(()=>window.picker.setBusy(false));
+ await page.locator('#test-picker #photo-files-other').setInputFiles({name:'bad.xlsx',mimeType:'application/octet-stream',buffer:png});assert.equal(await page.evaluate(()=>window.picker.count()),4);
+ assert.match(await page.locator('#test-picker #photo-hint').textContent(),/이미지 또는 PDF/);
+ await page.locator('#test-picker #photo-files-label').setInputFiles({name:'replacement.pdf',mimeType:'application/pdf',buffer:Buffer.from('test')});
+ assert.equal(await page.evaluate(()=>window.picker.count()),4);
  const attached=await page.evaluate(async()=>{
   const {createFollowup}=await import('./followup-controller.js');const calls=[];
   const followup=createFollowup({invoke:async(fn,arg,id)=>{calls.push({fn:fn.name,action:arg.action,id,slot:arg.slot,file:arg.file,data:arg.data});
@@ -98,17 +103,17 @@ try{
   },log:()=>{},stage:()=>{},target:{},tabId:10,getPhotos:()=>window.picker.files()});
   const result=await followup.attachPhotos({identity:{},context:{}});return {result,calls};
  });
- assert.deepEqual(attached.calls.filter(x=>x.action==='begin').map(x=>[x.slot,x.file.name]),[[0,'3_other.png'],[9,'2_front.png'],[10,'10_other.png']]);
- assert.ok(attached.calls.every(x=>x.id===10));assert.equal(attached.calls.filter(x=>x.action==='commit').length,3);
+ assert.deepEqual(attached.calls.filter(x=>x.action==='begin').map(x=>[x.slot,x.file.name]),[[0,'replacement.pdf'],[9,'2_front.png'],[10,'10_other.png'],[11,'3_other.pdf']]);
+ assert.ok(attached.calls.every(x=>x.id===10));assert.equal(attached.calls.filter(x=>x.action==='commit').length,4);
  assert.ok(attached.calls.filter(x=>x.action==='begin').every(x=>x.file.size===4&&x.file.sha256==='9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08'));
  assert.ok(attached.calls.filter(x=>x.action==='chunk').every(x=>x.data==='dGVzdA=='));
  checks.push('photo provider keeps original bytes/hash and sends chosen roles to exact original tab and correct slots');
- checks.push('file selection/drop, filename roles, deterministic order, manual reorder, missing-role block and busy protection');
- await page.locator('#test-picker').evaluate(e=>e.remove());
+ checks.push('fixed attachment slots, PDF/drop, single-file replacement, manual order, Excel rejection and busy protection');
+ await page.locator('#test-picker').evaluate(e=>e.remove());await page.locator('#photo-result').evaluate(e=>e.textContent='');
  await mkdir(new URL('../artifacts/screenshots',import.meta.url),{recursive:true});
  await page.screenshot({path:new URL('../artifacts/screenshots/12-simple-input.png',import.meta.url).pathname,fullPage:true});
  await page.setViewportSize({width:390,height:720});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
- await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));
+ await page.goto(base+'assist.html');await page.setViewportSize({width:460,height:530});await page.getByRole('heading',{name:'무엇을 할까요?'}).waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight));assert.equal(await page.locator('.app-version').textContent(),'v1.0.7');assert.match(await page.title(),/v1.0.7/);
  await page.screenshot({path:new URL('../artifacts/screenshots/11-compact-home.png',import.meta.url).pathname});
  await page.setViewportSize({width:1000,height:900});
  const resized=await page.evaluate(async()=>{const {sizeAssistWindow}=await import('./assist-window.js');const updates=[];chrome.windows.update=async(id,value)=>updates.push(value);chrome.windows.getCurrent=async()=>({id:1,type:'normal',state:'normal',left:0,top:0});await sizeAssistWindow(true);const normal=updates.length;chrome.windows.getCurrent=async()=>({id:2,type:'popup',state:'normal',left:0,top:0});await sizeAssistWindow(true);await sizeAssistWindow(false);return {normal,updates};});

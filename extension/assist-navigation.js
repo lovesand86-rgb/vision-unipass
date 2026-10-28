@@ -1,3 +1,5 @@
+const displayedVersion=globalThis.chrome?.runtime?.getManifest?.().version;
+if(displayedVersion){document.title+=' · v'+displayedVersion;const brand=document.querySelector('.brand strong');if(brand){const v=document.createElement('small');v.className='app-version';v.textContent='v'+displayedVersion;brand.after(v);}}
 import {sizeAssistWindow} from './assist-window.js';
 if(!location.pathname.endsWith('/assist.html'))void sizeAssistWindow();
 // Navigate within the existing app window; UNI-PASS stays in its own Chrome tab.
