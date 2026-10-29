@@ -1,3 +1,4 @@
+import {takeAttachments} from './attachment-handoff.js';
 import {createPhotoPicker} from './photo-picker.js';
 import {guardToolNavigation} from './assist-navigation.js';
 import {cargoStep} from './cargo-step.js';
@@ -352,3 +353,16 @@ $('sequence-save-contact').addEventListener('click',async()=>{
   if(saved)await run();
 });
 guardToolNavigation(()=>busy);
+
+// Only a bound, one-use preparation from this same app tab can start automatically.
+const preparedToken=new URL(location.href).searchParams.get('prepared');
+if(preparedToken){
+ busy=true;refresh();
+ try{
+  const app=await chrome.tabs.getCurrent();
+  const files=await takeAttachments(preparedToken,{appTab:app.id,targetTab:target,jobKey:JSON.stringify(job)});
+  busy=false;photos.setBusy(false);photos.restore(files);
+  history.replaceState(null,'',location.pathname+'?tab='+target);
+  await run();
+ }catch(error){busy=false;lastError=error.message;refresh();showResult();}
+}

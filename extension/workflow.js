@@ -1,3 +1,5 @@
+import {createPhotoPicker} from './photo-picker.js';
+import {putAttachments} from './attachment-handoff.js';
 import {guardToolNavigation,continueInTool} from './assist-navigation.js';
 import {watchLabelNotice} from './label-notice.js';
 import {declarationStep} from './search-copy.js';
@@ -7,12 +9,14 @@ const key = 'visionCopyAttemptV1';
 const origin = 'https://unipass.customs.go.kr/*';
 const originalPath = '/csp/csw/reqrqstmt/apfmmt/foodEtcImpDcshMtCtr/retrieveApfmOdv.do';
 let job = targets.searchTarget||null, busy = false, starting = false;
-const canChain=()=>job&&targets.searchTarget&&targets.itemTarget&&targets.commonTarget&&
+const canChain=()=>job&&targets.searchTarget&&targets.cargoTarget&&targets.itemTarget&&targets.commonTarget&&
   JSON.stringify(job)===JSON.stringify(targets.searchTarget);
+const photos=createPhotoPicker($('photo-picker'));
 let draftDiagnostics = [];
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const status = message => { $('workflow-status').textContent = message; $('workflow-status').hidden=!message; };
 function showJob(){
+ $('workflow-photo-panel').hidden=!canChain();
  const box=$('job-summary');box.replaceChildren();box.hidden=!job;
  $('job-files').open=!job;$('job-files').querySelector('summary').textContent=job?'작업 파일 바꾸기':'작업 파일을 선택해주세요';
  if(!job)return;
@@ -20,7 +24,7 @@ function showJob(){
 }
 const log = message => { const li = document.createElement('li'); li.textContent = message; $('workflow-log').append(li); status(message); };
 const refresh = () => {
-  const working=busy||starting;
+  const working=busy||starting;photos.setBusy(working);
   $('workflow-job').disabled = working;
   $('find-list').disabled = working || !job;
   $('list-target').disabled = working;
@@ -95,7 +99,7 @@ const showDraft = async (attempt, tab) => {
   await chrome.windows.update(tab.windowId, {focused: true});
 };
 $('workflow-job').addEventListener('change', async () => {
-  job = null;
+  photos.restore([]);job = null;
   $('list-choice').hidden=true;
   $('list-target').replaceChildren(new Option('처리현황을 찾아주세요', ''));
   $('job-summary').textContent = '';
@@ -211,7 +215,10 @@ async function lockedRun(checkOnly,chain=false,resumeOnly=false) {
   } catch (error) { log(error.message || '확인할 수 없는 오류로 중단했습니다.'); }
   finally { busy = false; refresh(); }
   // The shared lock and notice debugger have been released before handoff.
-  if(handoff!==null)continueInTool('cargo-workflow.html?tab='+handoff);
+  if(handoff!==null){
+    try{const app=await chrome.tabs.getCurrent();const transfer=await putAttachments(photos.files(),{appTab:app.id,targetTab:handoff,jobKey:JSON.stringify(targets.cargoTarget)});continueInTool('cargo-workflow.html?tab='+handoff+'&prepared='+transfer);}
+    catch(error){log('준비한 첨부를 연결하지 못했습니다. 파일은 이 화면에 유지됩니다. '+error.message);}
+  }
   return needsList;
 }
 $('start-sequence').addEventListener('click',async()=>{
@@ -260,11 +267,11 @@ $('close-attempt').addEventListener('click', async () => {
       const closed = {...attempt, stage: 'closed_by_user', previousStage: attempt.stage,
         closedAt: new Date().toISOString(), closure: 'user_requested_next_job_no_open_draft'};
       await chrome.storage.local.set({[key]: closed, visionLastClosedCopyAttemptV1: closed});
-      cleared=true;log('이전 작업 기록을 보관했습니다. 다음 건을 시작합니다.');
+      cleared=true;log('이전 작업 기록을 보관했습니다. 다음 건을 준비합니다.');
     });
   } catch (error) { status(error.message || '이전 작업 기록을 유지했습니다.'); }
   finally { busy = false; refresh(); }
-  if(cleared)$('start-sequence').click();
+  if(cleared){photos.restore([]);status('다음 건의 사진·서류를 준비하고 시작하기를 누르세요.');$('workflow-photo-panel').scrollIntoView({block:'start'});}
 });
 showJob();
 refresh();

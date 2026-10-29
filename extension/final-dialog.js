@@ -1,7 +1,7 @@
 // Narrow informational-result recognition; no confirm/prompt is auto-accepted.
 export function classifyFinalMessage(kind,message){
   const s=String(message||'').normalize('NFKC').replace(/\s/g,'');
-  if(kind==='validate'&&/^(?:(?:오류검증|검증)(?:결과)?[:：]?)?(?:오류가?없습니다|문제가?없습니다|정상입니다)[.!。]?$/.test(s))return 'success';
+  if(kind==='validate'&&/^(?:(?:오류검증|검증)(?:결과)?[:：]?)?(?:오류가?없습니다|오류가존재하지않습니다|문제가?없습니다|정상입니다)[.!。]?$/.test(s))return 'success';
   if(kind==='save'&&/^(?:정상적으로)?임시저장(?:이)?(?:되었습니다|완료되었습니다)[.!。]?$/.test(s))return 'success';
   if(kind==='send'&&/^(?:정상적으로)?전송(?:이)?(?:되었습니다|완료되었습니다)[.!。]?$/.test(s))return 'success';
   if(/입력하|입력해|선택하|선택해|필수|누락|실패|오류|할수없/.test(s))return 'error';

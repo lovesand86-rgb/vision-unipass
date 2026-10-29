@@ -1,3 +1,4 @@
+import {validateAttachments} from './attachment-handoff.js';
 const allowed=/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i;
 // Kept for older imports; fixed attachment areas no longer infer roles from names.
 export function photoRole(name){const label=/한글|표시|label/i.test(name),front=/전면|정면|front/i.test(name);return label!==front?(label?'label':'front'):'other';}
@@ -52,5 +53,10 @@ export function createPhotoPicker(root,onChange=()=>{}){
   render();onChange();
  }
  for(const event of ['dragover','drop'])document.addEventListener(event,e=>{if([...e.dataTransfer?.types||[]].includes('Files'))e.preventDefault();});
- render();return {ready,count,setBusy(value){busy=value;render();},files(){return groups.flatMap(g=>g.items.map((x,i)=>({slot:g.role==='label'?0:g.role==='front'?9:10+i,file:x.file})));}};
+ render();return {ready,count,restore(entries){
+  if(busy)throw Error('입력 중에는 첨부를 바꿀 수 없습니다.');validateAttachments(entries);
+  for(const g of groups){for(const item of g.items)if(item.url)URL.revokeObjectURL(item.url);g.items=[];}
+  for(const {slot,file}of [...entries].sort((a,b)=>a.slot-b.slot)){const role=slot===0?'label':slot===9?'front':'other';groups.find(g=>g.role===role).items.push({file,url:/\.(png|jpe?g|bmp|gif)$/i.test(file.name)?URL.createObjectURL(file):null});}
+  render();onChange();
+ },setBusy(value){busy=value;render();},files(){return groups.flatMap(g=>g.items.map((x,i)=>({slot:g.role==='label'?0:g.role==='front'?9:10+i,file:x.file})));}};
 }

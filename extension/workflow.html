@@ -2,14 +2,15 @@
 <title>비전 · 실적 검색과 복사</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="assist.css"><link rel="stylesheet" href="workflow.css"><link rel="stylesheet" href="assist-tool.css">
 <header class="tool-header"><a class="brand" href="assist.html" data-app-nav><span class="logo">v<span>·</span></span><span><strong>비전 어시스트</strong><small>VISION ASSIST</small></span></a><a class="icon-button" href="assist.html?view=settings" aria-label="설정" data-app-nav><svg viewBox="0 0 32 32" aria-hidden="true"><path d="m13 4 6 0 1 4 3 2 4-1 3 5-3 3v3l2 3-4 4-4-2-3 1-2 4-5-1-1-4-3-2-4 0-2-5 3-3v-3l-1-4 4-3 3 2z"/><circle cx="16" cy="16" r="5"/></svg></a></header><nav class="tool-nav"><a href="assist.html?view=history" data-app-nav>‹ 실적 기반 입력</a><span>비전 어시스트 작업 공간</span></nav><main class="simple-workflow">
-<h1>실적 불러오기</h1>
+<h1>작업 준비</h1>
 <p class="lead">UNI-PASS에 로그인하고 <strong>신청서 처리현황</strong>을 열어주세요.</p>
 <div id="job-summary" hidden></div>
 <details id="job-files"><summary>작업 파일 바꾸기</summary><label for="workflow-job" class="file-pick">작업 파일 선택</label><input id="workflow-job" class="sr-only" type="file" accept=".json,application/json"></details>
 <div id="list-choice" hidden><label for="list-target">어느 화면에서 진행할까요?</label><select id="list-target"><option value="">처리현황을 선택하세요</option></select></div>
-<button id="start-sequence" class="main-action" disabled>시작하기</button>
+<section id="workflow-photo-panel"><h2>사진·서류 첨부</h2><div id="photo-picker"></div></section>
+<div class="run-actions"><button id="start-sequence" class="main-action" disabled>시작하기</button></div>
 <p id="workflow-status" role="status" aria-live="polite" hidden></p>
-<button id="close-attempt" class="secondary" disabled>다음 건 시작</button>
+<button id="close-attempt" class="secondary" disabled>다음 건 준비</button>
 <details id="more-tools" class="extra-tools"><summary>도움이 필요할 때</summary>
 <button id="find-list" class="secondary" disabled>UNI-PASS 화면 다시 찾기</button>
 <button id="start-copy" class="secondary" disabled>실적 복사만 하기</button>

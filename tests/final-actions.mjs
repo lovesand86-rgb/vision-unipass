@@ -12,7 +12,7 @@ try{
  const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker'),base='chrome-extension://'+new URL(worker.url()).host+'/';
  const form=await context.newPage();await form.goto('https://unipass.customs.go.kr/csp/index.do');
  // Only known error/unknown test alerts are dismissed as a simulated user; success uses the real watcher.
- form.on('dialog',async d=>{if(!['오류가 없습니다.','임시저장되었습니다.','전송되었습니다.'].includes(d.message()))await d.dismiss();});
+ form.on('dialog',async d=>{if(!['오류검증 결과 오류가 존재하지 않습니다.','임시저장되었습니다.','전송되었습니다.'].includes(d.message()))await d.dismiss();});
  const app=await context.newPage();let tabId;
  async function setup(mode='success'){
   await form.reload();await form.evaluate(mode=>{
@@ -20,7 +20,7 @@ try{
    for(const [k,v]of Object.entries(fields)){const n=document.createElement('input');n.id=p+k;n.value=v;document.body.append(n);}
    document.body.insertAdjacentHTML('beforeend',`<select id="${p}dclrFdmcIttCd"><option>TEST AGENCY</option></select><table id="${p}prlstTbl"><tr><td><input type="radio" name="${p}prlstSlct"></td><td>26TEST</td></tr><tr><td>TEST PRODUCT</td></tr></table><table id="${p}koreIndcMatrTbl"><tr><td>TEST LABEL</td></tr></table><table id="${p}attachTbl"><tr><td><input type="file"></td></tr></table><button id="${p}btnVerifyErr">오류검증</button><button id="${p}btnRegistTemp">임시저장</button><button id="${p}btnTrsn">전송</button>`);
    window.counts={validate:0,save:0,send:0};
-   document.getElementById(p+'btnVerifyErr').onclick=()=>{window.counts.validate++;alert(mode==='validate-error'?'필수 항목을 입력하세요.':mode==='unknown'?'처리 결과를 확인하세요.':'오류가 없습니다.');};
+   document.getElementById(p+'btnVerifyErr').onclick=()=>{window.counts.validate++;alert(mode==='validate-error'?'필수 항목을 입력하세요.':mode==='unknown'?'처리 결과를 확인하세요.':'오류검증 결과 오류가 존재하지 않습니다.');};
    document.getElementById(p+'btnRegistTemp').onclick=()=>{window.counts.save++;if(mode==='save-error'){alert('저장에 실패했습니다.');return;}document.getElementById(p+'reqRqstNo3').value='0001';alert('임시저장되었습니다.');};
    document.getElementById(p+'btnTrsn').onclick=()=>{window.counts.send++;alert('전송되었습니다.');};
   },mode);

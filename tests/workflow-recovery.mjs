@@ -61,11 +61,12 @@ await page.evaluate(()=>{
 });
 await page.evaluate(()=>document.getElementById('close-attempt').hidden=false);await page.locator('#close-attempt').click();await page.waitForFunction(()=>!document.getElementById('close-attempt').disabled);
 assert.equal(await page.evaluate(()=>chrome.storage.local.get('visionCopyAttemptV1').then(x=>x.visionCopyAttemptV1.stage)),'copy_unknown');
+await page.locator('#photo-files-other').setInputFiles({name:'previous.pdf',mimeType:'application/pdf',buffer:Buffer.from('test')});
 await page.evaluate(()=>{chrome.scripting.executeScript=async({args})=>{window.calls.push({action:args[0].action});return [{frameId:0,result:args[0].action==='draft_presence'?{status:'no_draft'}:{list:false}}];};});
 await page.evaluate(()=>document.getElementById('close-attempt').hidden=false);await page.locator('#close-attempt').click();await page.waitForFunction(()=>document.getElementById('workflow-log').textContent.includes('이전 작업 기록을 보관'));
 assert.equal(await page.evaluate(()=>chrome.storage.local.get('visionLastClosedCopyAttemptV1').then(x=>x.visionLastClosedCopyAttemptV1.previousStage)),'copy_unknown');
-assert.ok(await page.evaluate(()=>window.calls.some(x=>x.action==='probe')));
-assert.equal(await page.locator('#closed-draft-ack').count(),0);
+assert.equal(await page.evaluate(()=>window.calls.some(x=>x.action==='copy')),false);assert.match(await page.locator('#workflow-status').textContent(),/다음 건의 사진/);
+assert.equal(await page.locator('#closed-draft-ack').count(),0);assert.equal(await page.locator('.photo-card').count(),0);
 // Exercise search/result on a real synthetic DOM, including hidden duplicate IDs.
 const fields=['qryStrtDt','qryEndDt','owrEntsConm','reqRqstNo','reqRqstAcapNo','reqIttApreNo','prlstCdCn','blNoCn','cargMtNo','ovrsEntsConm','aplcUserId','reqUserId','dcerSgn'];
 await form.setContent(baseHtml+select+'<input type="checkbox" id="excelCheck"><select id="reqRqstPrcsSttsClsfCd"><option value="">전체</option></select>'+fields.map(id=>`<input type="text" id="${id}">`).join('')+'<div hidden>'+select+'<button id="btnQry">조회</button><table id="qryTbl1"></table></div>');
