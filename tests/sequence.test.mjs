@@ -16,7 +16,10 @@ test('existing valid applicant contact is used without a repeat confirmation',as
  const result=await runCommonSequence({invoke,job,applicationRef:snapshot.application_ref,log:()=>{},stage:()=>{},onContact:()=>asked++});
  assert.equal(asked,0);assert.equal(result.status,'common_completed');assert.equal(store[profileKey][profileId(snapshot)].phone,snapshot.phone);
  assert.ok(applied.some(f=>f.applicant_phone?.value===snapshot.phone&&f.applicant_mobile?.value===snapshot.mobile));
- delete store[profileKey];snapshot.phone='';applied.length=0;
+ applied.length=0;job.contact={phone:'02-9999-8888',mobile:'',confirmed:true};
+ const partial=await runCommonSequence({invoke,job,applicationRef:snapshot.application_ref,log:()=>{},stage:()=>{},onContact:()=>asked++});
+ assert.equal(partial.status,'common_completed');assert.ok(applied.some(f=>f.applicant_phone?.value==='02-9999-8888'&&f.applicant_mobile?.value===snapshot.mobile));assert.equal(asked,0);
+ delete job.contact;delete store[profileKey];snapshot.phone='';applied.length=0;
  const missing=await runCommonSequence({invoke,job,applicationRef:snapshot.application_ref,log:()=>{},stage:()=>{},onContact:()=>asked++});
  assert.equal(missing.status,'needs_contact');assert.equal(asked,1);assert.ok(applied.every(f=>!f.applicant_phone));
  delete globalThis.chrome;

@@ -72,8 +72,10 @@ export async function runCommonSequence({invoke,job,applicationRef,log,stage,onC
 
   stage('contact','확인 중');
   const profiles=(await chrome.storage.local.get(profileKey))[profileKey]||{};
-  let contact=validContact(job.contact)?job.contact:profiles[profileId(snapshot)];
-  if(!validContact(contact)&&validContact({...snapshot,confirmed:true})){
+  const requested=job.contact?.confirmed===true?{phone:job.contact.phone||snapshot.phone,mobile:job.contact.mobile||snapshot.mobile,confirmed:true}:null;
+  let contact=validContact(requested)?requested:profiles[profileId(snapshot)];
+  if(job.contact?.phone&&!validContact(requested))contact=null;
+  if(!validContact(contact)&&!job.contact?.phone&&validContact({...snapshot,confirmed:true})){
     await saveSequenceContact({invoke,snapshot,phone:snapshot.phone,mobile:snapshot.mobile});
     contact={phone:snapshot.phone,mobile:snapshot.mobile,confirmed:true};
   }
