@@ -1,15 +1,17 @@
+import {mountContact} from './applicant-contact.js';
+import {WORKBOOK_NAME,folderWorkbook,prepareImportedJob,rememberImportedJob} from './intake-folder.js';
 import {COMPANY,OWNER,SHIPMENT,CARGO,AMOUNTS,LIBRARY_KEY,readLibrary,changeLibrary,makeOwner,upsertJob,useProduct,labelRule,applyLabelDates,parseLibrary} from './intake-library.js';
 import {runNewIntake} from './intake-runner.js';
 import {templateBase64,guide} from './intake-assets.js';
 import {intakeDOM} from './intake-dom.js';
-import {BASIC,TABLES,blankJob,fromTables,validateIntake,compileTargets,searchPeriods,applyPrevious,decimal} from './intake-model.js';
+import {BASIC,TABLES,blankJob,fromTables,validateIntake,compileTargets,intakeSearchPeriods,referenceSearch,applyPrevious,decimal} from './intake-model.js';
 import {readWorkbook} from './workbook.js';
 import {draftStore} from './intake-store.js';
 import {chooseUnipassTab,continueInTool,guardToolNavigation} from './assist-navigation.js';
 import {putAttachments} from './attachment-handoff.js';
 import {declarationStep} from './search-copy.js';
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
-let activeStep=0;
+let activeStep=1;
 function setStep(n){activeStep=n;$('data-step').hidden=n!==0;$('photos-step').hidden=n!==1;$('step-data').classList.toggle('active',n===0);$('step-photos').classList.toggle('active',n===1);}
 let job=blankJob(new URL(location.href).searchParams.get('kind')==='new'?'new':'history'),busy=false,starting=false,files=[],selected=new Map(),role='label',prior=null,discovery=null,objectURLs=[];
 let diagnostics=null,library=await readLibrary(),ownerId='',draftTimer,lastDraft=null;
@@ -20,7 +22,7 @@ const settingsKey='visionIntakeDefaultsV1';
 let defaults=library.company;
 function applyDefaults(){for(const [k,v]of Object.entries(defaults))if(BASIC.includes(k)&&!job.basic[k])job.basic[k]=v;}
 applyDefaults();
-function field(label,value,change){const l=el('label',label),input=el('input');input.value=value||'';input.setAttribute('aria-label',label);if(['선적일','제조일자','소비기한','반입일'].includes(label))input.type='date';input.onchange=()=>{change(input.value.trim());scheduleDraft();};l.append(input);return l;}
+function field(label,value,change){const l=el('label',label),input=el('input');input.value=value||'';input.setAttribute('aria-label',label);if(['선적일','제조일자','소비기한','반입일','실적신청일'].includes(label))input.type='date';input.onchange=()=>{change(input.value.trim());renderSummary();scheduleDraft();};l.append(input);return l;}
 function render(){
  document.querySelector('main').dataset.jobId=job.id;
  renderPickers();$('mode').textContent=job.kind==='new'?'신규 입력':'실적 기반 입력';$('start').textContent=job.kind==='new'?'신규 입력 시작 · 이어하기':'입력 시작';$('find-previous').hidden=job.kind!=='history';
@@ -48,8 +50,16 @@ function render(){
   });
   const add=el('button','＋ 행 추가','button small');add.onclick=()=>{job[key].push(Object.fromEntries(TABLES[name].map(k=>[k,''])));render();scheduleDraft();};wrap.append(table);details.append(summary,wrap,add);$('tables').append(details);
  }
- renderLabels();renderPhotos();if(busy)document.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=true);
+ renderLabels();renderPhotos();renderSummary();if(busy)document.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=true);
 }
+function renderSummary(){
+ const area=$('job-summary');area.replaceChildren();area.hidden=!job.items.some(r=>r.제품명);if(area.hidden)return;
+ const list=el('dl'),b=job.basic;
+ for(const [title,value]of [['자료',job.inputFile||'직접 입력·저장 자료'],['화주',[b.수입화주명,b.수입화주사업자번호].filter(Boolean).join(' · ')],['제품',job.items.map(r=>r.한글명||r.제품명).join(' / ')],['선적일',b.선적일],['H B/L',job.items[0]?.HBL],['실적 찾기',b.실적접수번호?'접수번호 '+b.실적접수번호:b.실적신청번호?'신청번호 '+b.실적신청번호:'동일 제품 최신 실적 자동 조회']]){list.append(el('dt',title),el('dd',value||'자료 없음'));}
+ for(const [i,r]of job.items.entries())list.append(el('dt',job.items.length>1?'품목 '+(i+1):'수량·금액'),el('dd',[(r.수량||'—')+' '+(r.수량단위||''),(r.순중량kg||'—')+' kg',(r.금액USD||'—')+' USD'].join(' · ')));
+ area.append(list);
+}
+function refreshContact(){return mountContact($('applicant-contact'),next=>{const before=defaults;library=next;defaults=next.company;for(const k of COMPANY)if(!job.basic[k]||job.basic[k]===before[k])job.basic[k]=defaults[k]||'';render();scheduleDraft();}).catch(e=>status(e.message));}
 function previousFor(index){
  if(prior&&index===0)return prior;const p=library.products.find(p=>p.id===job.library?.productId);
  if(!p||p.ownerId!==String(job.basic.수입화주사업자번호).replace(/[\s-]/g,'')||p.basic.제조업소등록번호!==job.basic.제조업소등록번호)return null;
@@ -80,22 +90,37 @@ function renderPhotos(){
 function on(id,fn,event='click'){$(id).addEventListener(event,async()=>{if(busy||starting)return;try{await fn();}catch(e){log(e.message);}});}
 async function withBusy(fn){if(busy)return;busy=true;document.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=true);try{await fn();}finally{busy=false;document.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=false);}}
 const download=(blob,name)=>{const a=el('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
-on('template',()=>download(new Blob([Uint8Array.from(atob(templateBase64),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'비전-입력양식.xlsx'));
+on('template',()=>download(new Blob([Uint8Array.from(atob(templateBase64),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),WORKBOOK_NAME));
 on('guide',()=>download(new Blob([guide],{type:'text/plain;charset=utf-8'}),'GPT-자료정리지침.txt'));
 on('inspect',async()=>{const tab=await chooseUnipassTab();if(!tab)return;const result=await chrome.scripting.executeScript({target:{tabId:tab.id},func:intakeDOM,args:[{action:'diagnostics'}]});diagnostics=result.find(r=>r.frameId===0)?.result;status('입력칸 이름과 버튼 구조를 읽었습니다. 기록 저장으로 내보낼 수 있습니다. 입력값은 수집하지 않았습니다.');});
 on('step-data',()=>setStep(0));on('step-photos',()=>setStep(1));on('extra-picker',()=>$('extra-files').click());
 on('folder',()=>$('folder-input').click());on('excel',()=>$('excel-input').click());
-async function importFile(file){const next=fromTables(await readWorkbook(file),job.kind);job=next;ownerId='';discovery=prior=null;applyDefaults();render();$('registration').open=true;scheduleDraft();const errors=validateIntake(job);status(errors.length?errors.join('\n'):'엑셀을 불러왔습니다. 사진을 선택하고 시작하세요.');}
-on('excel-input',async()=>{if($('excel-input').files[0])await importFile($('excel-input').files[0]);},'change');
-on('folder-input',async()=>{
- const all=[...$('folder-input').files];if(all.length>1000)throw Error('한 건의 폴더를 선택해주세요. 최대 1,000파일입니다.');
- files=all.filter(f=>/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i.test(f.name));selected.clear();role='label';discovery=prior=null;
- $('folder-name').textContent=(all[0]?.webkitRelativePath.split('/')[0]||'폴더')+' · 사진/PDF '+files.length+'개';
- const books=all.filter(f=>/\.xlsx$/i.test(f.name)&&!f.name.startsWith('~$'));$('workbooks').replaceChildren(new Option('읽을 엑셀 선택',''));$('workbooks').hidden=!books.length;
+async function resetForWorkbook(){
+ if(job.items.some(r=>r.제품명)||hasShipment())await saveDraft();
+ clearTimeout(draftTimer);draftTimer=null;job=blankJob(job.kind);ownerId='';applyDefaults();selected.clear();role='label';discovery=prior=null;$('continue-draft').hidden=true;$('registration').open=false;render();
+}
+async function importFile(file,{reset=true}={}){
+ if(reset)await resetForWorkbook();
+ const next=prepareImportedJob(fromTables(await readWorkbook(file),job.kind),library);
+ next.inputFile=file.webkitRelativePath||file.name;next.folderName=job.folderName||'';
+ let ref;library=await changeLibrary(old=>{const result=rememberImportedJob(old,next);ref=result.ref;return result.library;});
+ if(ref)next.library=ref;job=next;ownerId=ref?.ownerId||'';discovery=prior=null;render();setStep(1);scheduleDraft();
+ const errors=validateIntake(job);status(errors.length?errors.join('\n'):'화주·제품·이번 선적 정보를 읽었습니다. 사진을 고르고 시작하세요.');
+}
+on('excel-input',()=>withBusy(async()=>{const file=$('excel-input').files[0];if(file)await importFile(file);$('excel-input').value='';}),'change');
+on('folder-input',()=>withBusy(async()=>{
+ const all=[...$('folder-input').files];if(all.length>1000)throw Error('한 건의 폴더를 선택해주세요. 최대 1,000파일입니다.');if(!all.length)return;
+ await resetForWorkbook();files=all.filter(f=>/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i.test(f.name));
+ job.folderName=all[0]?.webkitRelativePath.split('/')[0]||'폴더';
+ $('folder-name').textContent=job.folderName+' · 사진/PDF '+files.length+'개';
+ const {books,file,ambiguous}=folderWorkbook(all);$('workbooks').replaceChildren(new Option('읽을 엑셀 선택',''));$('workbooks').hidden=!!file||!books.length;
  for(const [i,f]of books.entries())$('workbooks').append(new Option(f.webkitRelativePath||f.name,String(i)));
- $('workbooks').onchange=()=>{if($('workbooks').value!=='')importFile(books[Number($('workbooks').value)]).catch(e=>status(e.message));};
- renderPhotos();scheduleDraft();status(books.length?'사진을 불러왔습니다. 엑셀을 사용할 때만 목록에서 선택하세요.':'사진을 불러왔습니다. 저장한 제품과 이번 선적 정보로 진행하세요.');
-},'change');
+ $('workbooks').onchange=()=>{if(!busy&&$('workbooks').value!=='')withBusy(()=>importFile(books[Number($('workbooks').value)])).catch(e=>status(e.message));};
+ render();setStep(1);
+ if(file)await importFile(file,{reset:false});
+ else status(ambiguous?'같은 이름의 신고자료가 여러 개입니다. 목록에서 이번 건 파일 하나를 선택해주세요.':WORKBOOK_NAME+'가 없습니다. 폴더에 넣고 다시 선택하거나 엑셀만 선택해주세요.');
+ scheduleDraft();$('folder-input').value='';
+}),'change');
 on('extra-files',()=>{setStep(1);files.push(...[...$('extra-files').files].filter(f=>/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i.test(f.name)));renderPhotos();scheduleDraft();},'change');
 on('add-item',()=>{job.items.push({품목ID:'P'+crypto.randomUUID().slice(0,8)});discovery=prior=null;render();scheduleDraft();});
 on('settings',companyDialog);on('dialog-close',()=>$('dialog').close());
@@ -110,8 +135,8 @@ async function discover(){
  const item=job.items[0],b=job.basic;for(const value of [item?.제품명,b.수입화주명,b.수입화주사업자번호,b.제조업소명,b.제조업소등록번호])if(!value)throw Error('제품명·화주명/사업자번호·제조업소명/등록번호를 입력해주세요.');
  await withBusy(async()=>{
   const searchJob={format:'vision-unipass-search-copy',version:1,identity:{product_name:item.제품명,importer_name:b.수입화주명,importer_id:b.수입화주사업자번호,manufacturer_name:b.제조업소명,manufacturer_id:b.제조업소등록번호},source_application:'AUTO-26-A'};
-  for(const period of searchPeriods()){
-   log(period.from+' ~ '+period.to+' 동일 실적 검색');searchJob.search={...period,product_term:item.제품명,importer_term:b.수입화주명};const token=crypto.randomUUID();await invoke(tab.id,'search',searchJob,{token});
+  for(const period of intakeSearchPeriods(b)){
+   log(period.from+' ~ '+period.to+(b.실적접수번호?' 접수번호 '+b.실적접수번호:b.실적신청번호?' 신청번호 '+b.실적신청번호:' 동일 실적')+' 검색');searchJob.search={...period,...referenceSearch(b),product_term:item.제품명,importer_term:b.수입화주명};const token=crypto.randomUUID();await invoke(tab.id,'search',searchJob,{token});
    let result;const until=Date.now()+20000;do{result=await invoke(tab.id,'candidates',searchJob,{token});if(result.status==='candidates')break;await new Promise(r=>setTimeout(r,350));}while(Date.now()<until);
    if(result?.status!=='candidates')throw Error('실적 조회 응답이 없습니다.');if(!result.candidates.length)continue;
    if(result.candidates.length>1&&result.candidates[0].date===result.candidates[1].date)throw Error('같은 날짜 실적이 여러 개입니다. 원문을 확인해서 사용할 실적을 선택해야 합니다.');
@@ -128,13 +153,14 @@ async function discover(){
    if(!original)throw Error('실적 원문에서 화주·제조업소 등록번호를 확인하지 못했습니다.');
    prior=original.result.previous;discovery.searchJob=searchJob;discovery.token=token;
    render();log(prior?'원문의 동일 제품·등록번호와 이전 값을 읽었습니다. 필요한 값만 적용하세요.':'원문 등록번호를 확인했습니다. 이전 수량의 단위까지 읽지 못해 자동 적용은 표시하지 않습니다.');return;
-  }throw Error('최근 3년에서 동일 실적을 찾지 못했습니다. 신규 입력 또는 이전 도구에서 기간을 지정해주세요.');
+  }throw Error(b.실적접수번호||b.실적신청번호?'지정한 실적과 일치하는 결과가 없습니다. 실적번호·실적신청일을 확인해주세요. 다른 실적으로 대체하지 않았습니다.':'최근 3년에서 동일 실적을 찾지 못했습니다. 엑셀에 실적번호와 실적신청일을 넣어 더 오래된 실적을 지정할 수 있습니다.');
  });
 }
 on('find-previous',discover);
 on('start',async()=>{
  if(starting)return;starting=true;try{
- applyLabelDates(job);const errors=validateIntake(job,{execution:true});if(errors.length){$('registration').open=!job.library;throw Error(errors.join('\n'));}
+ applyLabelDates(job);const errors=validateIntake(job,{execution:true});if(errors.length){throw Error('신고자료에서 확인할 항목:\n'+errors.join('\n'));}
+ if(![...selected.values()].includes('front')||![...selected.values()].includes('label'))throw Error('시작 전에 한글표시 사진과 제품 전면 사진을 선택해주세요.');
  await saveDraft();await rememberValues();
  if(job.kind==='history'){
   if(job.items.length!==1)throw Error('실적 기반 자동 입력은 현재 한 품목씩 진행합니다.');
@@ -180,7 +206,7 @@ on('owner-select',async()=>{const id=$('owner-select').value;if(!await allowSwit
 on('product-select',async()=>{const id=$('product-select').value;if(!id)return;if(!await allowSwitch()){renderPickers();return;}job=useProduct(library,id,job.kind);clearSelection();$('registration').open=false;render();scheduleDraft();status('기본정보를 불러왔습니다. 이번 선적의 값과 사진만 넣으세요.');},'change');
 on('product-search',renderPickers,'input');
 on('new-product',async()=>{if(!await allowSwitch())return;job=blankJob(job.kind);applyDefaults();const o=library.owners.find(o=>o.id===ownerId);if(o)Object.assign(job.basic,o.basic);clearSelection();render();$('registration').open=true;$('registration').scrollIntoView({behavior:'smooth'});});
-on('next-job',()=>withBusy(async()=>{if(!await allowSwitch())return;const id=job.library?.productId;job=id?useProduct(library,id,job.kind):blankJob(job.kind);applyDefaults();clearSelection(true);render();setStep(0);status('새 작업입니다. 이전 화물번호·수량·날짜·사진 선택을 비웠습니다.');}));
+on('next-job',()=>withBusy(async()=>{if(!await allowSwitch())return;const id=job.library?.productId;job=id?useProduct(library,id,job.kind):blankJob(job.kind);applyDefaults();clearSelection(true);render();setStep(1);status('다음 선적 폴더를 선택하세요. 이전 화물번호·수량·날짜·사진 선택을 비웠습니다.');}));
 on('save-current',()=>$('save-profile').click());
 on('save-profile',()=>withBusy(async()=>{
  let ref;library=await changeLibrary(old=>{const result=upsertJob(old,job);ref=result.ref;return result.library;});job.library=ref;ownerId=ref.ownerId;defaults=library.company;render();$('registration').open=false;await saveDraft();status('화주·제품을 저장했습니다. 다음부터 목록에서 선택하면 됩니다.');
@@ -192,9 +218,9 @@ async function rememberValues(){if(!job.library||job.items.some(r=>AMOUNTS.some(
  p.previous=job.items.map(r=>({...Object.fromEntries(AMOUNTS.map(k=>[k,r[k]])),product:r.제품명,unit:r.수량단위,currency:'USD',at:Date.now()}));p.at=Date.now();return old;
  });}
 function companyDialog(){
- const next={...defaults};$('dialog-body').replaceChildren(el('h2','우리 회사 기본정보'),el('p','처음 한 번 저장하면 새 작업에 자동으로 채웁니다.','muted'));
+ const next={...defaults};$('dialog-body').replaceChildren(el('h2','우리 회사 기본정보'),el('p','대행업체 번호는 기본값으로 준비했습니다. 신청인 전화번호는 첫 화면에서 저장하며, 아래 추가 연락처는 필요한 경우에만 지정합니다.','muted'));
  for(const key of COMPANY)$('dialog-body').append(field(key,next[key],v=>next[key]=v));
- const save=el('button','회사 기본정보 저장','button green');save.onclick=async()=>{try{const previous=defaults;library=await changeLibrary(old=>({...old,company:next}));defaults=library.company;await chrome.storage.local.set({[settingsKey]:defaults});for(const k of COMPANY)if(!job.basic[k]||job.basic[k]===previous[k])job.basic[k]=defaults[k];render();$('dialog').close();scheduleDraft();status('회사 기본정보를 저장했습니다.');}catch(e){status(e.message);}};$('dialog-body').append(save);$('dialog').showModal();
+ const save=el('button','회사 기본정보 저장','button green');save.onclick=async()=>{try{const previous=defaults;library=await changeLibrary(old=>({...old,company:next}));defaults=library.company;await chrome.storage.local.set({[settingsKey]:defaults});for(const k of COMPANY)if(!job.basic[k]||job.basic[k]===previous[k])job.basic[k]=defaults[k];render();refreshContact();$('dialog').close();scheduleDraft();status('회사 기본정보를 저장했습니다.');}catch(e){status(e.message);}};$('dialog-body').append(save);$('dialog').showModal();
 }
 function manageLibrary(){
  $('dialog-body').replaceChildren(el('h2','저장한 기본정보'));
@@ -218,7 +244,7 @@ async function saveDraft(){
  if(kept.reduce((n,f)=>n+f.size,0)>60000000)throw Error('저장할 첨부 합계는 60MB 이하입니다.');
  const draft={id:job.id,job:structuredClone(job),files:[...kept],selected:assignments,activeStep,at:Date.now()};await navigator.locks.request('visionDraft:'+job.id,()=>draftStore('save',draft));$('draft-status').textContent='이 PC에 자동 저장됨';
 }
-function restoreDraft(d){clearTimeout(draftTimer);draftTimer=null;job=d.job;files=d.files;selected=new Map(d.selected);ownerId=job.library?.ownerId||'';role=[...selected.values()].includes('label')?([...selected.values()].includes('front')?'other':'front'):'label';discovery=prior=null;render();setStep(d.activeStep||0);$('continue-draft').hidden=true;status('저장한 작업을 불러왔습니다.');}
+function restoreDraft(d){clearTimeout(draftTimer);draftTimer=null;job=d.job;applyDefaults();files=d.files;selected=new Map(d.selected);ownerId=job.library?.ownerId||'';role=[...selected.values()].includes('label')?([...selected.values()].includes('front')?'other':'front'):'label';discovery=prior=null;render();setStep(d.activeStep||0);$('continue-draft').hidden=true;$('folder-name').textContent=job.folderName?job.folderName+' · 저장한 폴더 자료':'저장한 준비 자료';status('저장한 작업을 불러왔습니다.');}
 on('continue-last',()=>{if(lastDraft)restoreDraft(lastDraft);});
 
-render();lastDraft=(await draftStore('list')).sort((a,b)=>b.at-a.at)[0];$('continue-draft').hidden=!lastDraft;if(new URL(location.href).searchParams.has('resume'))$('resume').click();if(new URL(location.href).searchParams.has('manage'))manageLibrary();const draftId=new URL(location.href).searchParams.get('draft');if(draftId){const d=await draftStore('get',draftId);if(d)restoreDraft(d);else status('저장된 작업을 찾지 못했습니다.');}guardToolNavigation(()=>busy||!!draftTimer);
+render();setStep(1);refreshContact();lastDraft=(await draftStore('list')).sort((a,b)=>b.at-a.at)[0];$('continue-draft').hidden=!lastDraft;if(new URL(location.href).searchParams.has('resume'))$('resume').click();if(new URL(location.href).searchParams.has('manage'))manageLibrary();const draftId=new URL(location.href).searchParams.get('draft');if(draftId){const d=await draftStore('get',draftId);if(d)restoreDraft(d);else status('저장된 작업을 찾지 못했습니다.');}guardToolNavigation(()=>busy||!!draftTimer);

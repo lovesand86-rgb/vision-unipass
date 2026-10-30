@@ -102,6 +102,8 @@ export async function declarationStep(request) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '') || new Date(value + 'T00:00:00Z').toISOString().slice(0, 10) !== value) fail('검색 기간 형식을 확인해 주세요.');
     }
     if (job.search.from > job.search.to) fail('검색 시작일이 종료일보다 늦습니다.');
+    if(job.search.receipt_no&&!/^[A-Z0-9-]{5,40}$/.test(job.search.receipt_no))fail('실적 접수번호 형식을 확인해주세요.');
+    if(job.search.application_no&&!/^[A-Z0-9]+-\d{2}-[A-Z0-9]+$/.test(job.search.application_no))fail('실적 신청번호 형식을 확인해주세요.');
     if (listControl('excelCheck').checked) fail('신청번호 엑셀조회 선택을 해제해 주세요.');
     selectLabel('reqApreIttCd', '식품의약품안전처');
     const start = Date.now();
@@ -115,7 +117,9 @@ export async function declarationStep(request) {
     for (const id of ['aplcUserId', 'reqRqstPrcsSttsClsfCd']) if (listControl(id).value.trim()) fail('추가 검색 조건을 비워 주세요: ' + id);
     for (const id of ['reqRqstNo', 'reqRqstAcapNo', 'reqIttApreNo', 'prlstCdCn', 'blNoCn', 'cargMtNo', 'ovrsEntsConm']) setter(id, '');
     setter('qryStrtDt', job.search.from); setter('qryEndDt', job.search.to);
-    setter('prnm', job.search.product_term); setter('owrEntsConm', job.search.importer_term);
+    setter('prnm', job.search.receipt_no||job.search.application_no?'':job.search.product_term); setter('owrEntsConm', job.search.receipt_no||job.search.application_no?'':job.search.importer_term);
+    if(job.search.receipt_no)setter('reqRqstAcapNo',job.search.receipt_no);
+    if(job.search.application_no)setter('reqRqstNo',job.search.application_no);
     const state = {token: request.token, filters: JSON.stringify(filters()), changed: false, lastChange: 0};
     window.__visionSearchObserver?.disconnect();
     window.__visionSearchState = state;
@@ -153,6 +157,8 @@ export async function declarationStep(request) {
       if(!cells.some(v=>norm(v)===norm(job.identity.product_name))||!cells.some(v=>company(v)===company(job.identity.importer_name))||!cells.some(v=>norm(v)===norm(job.identity.manufacturer_name))||!combined.includes('통관완료')||/취하|취소|반려/.test(combined))continue;
       const applications=rows.flatMap(r=>[...r.querySelectorAll('a')]).map(text).filter(v=>/^[A-Z0-9]+-\d{2}-[A-Z0-9]+$/.test(v));
       const dates=cells.filter(v=>/^\d{4}-\d{2}-\d{2}(?:\s|$)/.test(v)).map(v=>v.slice(0,10));
+      if(job.search.receipt_no&&!cells.some(v=>norm(v)===norm(job.search.receipt_no)))continue;
+      if(job.search.application_no&&!applications.includes(job.search.application_no))continue;
       if(applications.length!==1||!dates.length)fail('실적 신청번호·일자를 확인하지 못했습니다.');
       out.push({application:applications[0],date:dates[0]});
     }
@@ -184,6 +190,8 @@ export async function declarationStep(request) {
       const links = rows.flatMap(row => [...row.querySelectorAll('a')]).filter(a => text(a) === job.source_application);
       if (!links.length) continue;
       if (links.length !== 1) fail('지정한 신청번호 링크가 여러 개여서 중단했습니다.');
+      if(job.search.receipt_no&&!cells.some(c=>norm(text(c))===norm(job.search.receipt_no)))fail('지정한 실적 접수번호가 다릅니다.');
+      if(job.search.application_no&&job.source_application!==job.search.application_no)fail('지정한 실적 신청번호가 다릅니다.');
       const unmatched = [];
       if (!cells.some(cell => norm(text(cell)) === norm(job.identity.product_name))) unmatched.push('제품명');
       if (!cells.some(cell => company(text(cell)) === company(job.identity.importer_name))) unmatched.push('수입화주');

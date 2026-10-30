@@ -2,12 +2,14 @@ import {BASIC,TABLES,blankJob,decimal} from './intake-model.js';
 export const LIBRARY_KEY='visionIntakeLibraryV1';
 export const COMPANY=['대행업체사업자번호','대행업체허가번호','신청인전화','신청인휴대폰','화주휴대폰'];
 export const OWNER=['수입화주명','수입화주사업자번호','화주허가번호','화주휴대폰','신고기관','보관창고코드','검사기관코드'];
-export const SHIPMENT=['작업명','선적일','반입일','국내도착항','선적항','선기명','수입신고 참고사항'];
+export const SHIPMENT=['실적접수번호','실적신청번호','실적신청일','작업명','선적일','반입일','국내도착항','선적항','선기명','수입신고 참고사항'];
 export const CARGO=['HBL','MBL','화물관리번호','조회연도'];
 export const AMOUNTS=['수량','순중량kg','금액USD'];
 const FIXED=BASIC.filter(k=>!COMPANY.includes(k)&&!OWNER.includes(k)&&!SHIPMENT.includes(k));
 const copy=v=>structuredClone(v),pick=(o,ks)=>Object.fromEntries(ks.map(k=>[k,String(o?.[k]??'')]));
 const business=v=>String(v||'').replace(/[\s-]/g,'');
+export const COMPANY_DEFAULTS={대행업체사업자번호:'2068710015',대행업체허가번호:'20200003726'};
+export const companyDefaults=company=>({...COMPANY_DEFAULTS,...Object.fromEntries(Object.entries(company||{}).filter(([,v])=>v!==''))});
 export const emptyLibrary=()=>({schema:1,company:{},owners:[],products:[]});
 export function labelRule(row){
  if(['fixed','manual','manufactured','expiry'].includes(row.reuse))return row.reuse;
@@ -62,5 +64,5 @@ export function parseLibrary(text){
  return {schema:1,company:pick(x.company,COMPANY),owners:x.owners.map(o=>({id:o.id,basic:pick(o.basic,OWNER),at:0})),products:x.products.map(p=>({...pickProduct(p),at:0}))};
 }
 const pickProduct=p=>Object.fromEntries(['id','ownerId','revision','basic','items','types','labels','processes','ingredients','previous'].map(k=>[k,copy(p[k])]));
-export async function readLibrary(){const data=await chrome.storage.local.get([LIBRARY_KEY,'visionIntakeDefaultsV1']);return data[LIBRARY_KEY]||{...emptyLibrary(),company:pick(data.visionIntakeDefaultsV1,COMPANY)};}
+export async function readLibrary(){const data=await chrome.storage.local.get([LIBRARY_KEY,'visionIntakeDefaultsV1']);const library=data[LIBRARY_KEY]||{...emptyLibrary(),company:pick(data.visionIntakeDefaultsV1,COMPANY)};library.company=companyDefaults(library.company);return library;}
 export async function changeLibrary(fn){return navigator.locks.request(LIBRARY_KEY,async()=>{const old=await readLibrary(),next=await fn(old);await chrome.storage.local.set({[LIBRARY_KEY]:next});return next;});}
