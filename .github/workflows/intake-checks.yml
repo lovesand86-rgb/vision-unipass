@@ -17,11 +17,12 @@ jobs:
       - run: node --test tests/*.test.mjs
       - run: node tests/intake-browser.mjs
       - run: node tests/new-browser.mjs
+      - run: node tests/library-browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: intake-preview-screenshots
-          path: artifacts/screenshots/15-folder-intake.png
+          path: artifacts/screenshots/*.png
 
   windows-preview:
     needs: browser
@@ -45,11 +46,11 @@ jobs:
         run: dotnet publish host/VisionAssist.csproj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.33 -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/windows
       - name: Name installer
         shell: pwsh
-        run: Copy-Item artifacts/windows/VisionAssist.exe artifacts/VisionAssist-1.1.0-setup.exe
+        run: Copy-Item artifacts/windows/VisionAssist.exe artifacts/VisionAssist-preview-setup.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: vision-1.1.0-windows-preview
+          name: vision-windows-preview
           path: |
-            artifacts/VisionAssist-1.1.0-setup.exe
+            artifacts/VisionAssist-preview-setup.exe
             artifacts/vision-extension-core.zip
             artifacts/update.json

@@ -1,6 +1,6 @@
 {
   "name": "vision-assist",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -17,6 +17,7 @@
     "test:auto-validation": "node tests/auto-validation.mjs",
     "test:handoff": "node tests/attachment-handoff.mjs",
     "test:intake": "node tests/intake-browser.mjs",
-    "test:new": "node tests/new-browser.mjs"
+    "test:new": "node tests/new-browser.mjs",
+    "test:library": "node tests/library-browser.mjs"
   }
 }

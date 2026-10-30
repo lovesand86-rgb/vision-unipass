@@ -73,7 +73,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $notes = if ($env:PREVIEW -eq 'true') { 'release/PREVIEW-1.1.0.ko.md' } else { 'release/NOTES.ko.md' }
+          $notes = if ($env:PREVIEW -eq 'true') { "release/PREVIEW-${env:RELEASE_VERSION}.ko.md" } else { 'release/NOTES.ko.md' }
           $title = "비전 어시스트 $env:RELEASE_VERSION" + $(if ($env:PREVIEW -eq 'true') { ' 테스트' } else { '' })
           $existing = gh release view $env:RELEASE_TAG --json isDraft 2>$null
           if ($LASTEXITCODE -ne 0) {
