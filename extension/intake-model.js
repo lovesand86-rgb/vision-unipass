@@ -1,10 +1,11 @@
+import {representativeItem} from './new-plan.js';
 export const TABLES={
  기본정보:['항목','값','출처'],
- 품목:['품목ID','제품명','한글명','수량','수량단위','순중량kg','금액USD','소비기한','화물관리번호','HBL','MBL','조회연도','출처'],
+ 품목:['품목ID','제품명','한글명','수량','수량단위','순중량kg','금액USD','소비기한','화물관리번호','HBL','MBL','조회연도','출처','제조일자','대표품목'],
  제품유형:['제품유형코드','제품유형명'],
  표시사항:['표시사항코드','명칭','내용','출처'],
  제조공정:['순서','공정코드','공정명'],
- 성분:['성분ID','상위성분ID','구분','성분코드','성분명','배합비율','비율기준','출처']
+ 성분:['성분ID','상위성분ID','구분','성분코드','성분명','배합비율','비율기준','출처','제품구분','품목유형코드','품목유형명']
 };
 export const BASIC=['작업명','신고제품구분','신고기관','수입화주사업자번호','수입화주명','화주허가번호','화주휴대폰','제조업소등록번호','제조업소명','보관창고코드','검사기관코드','대행업체사업자번호','대행업체허가번호','신청인전화','신청인휴대폰','용도','생산국','수출국','선적일','반입일','국내도착항','선적항','선기명','HSK','수량단위','제품상태','무포장여부','유전자변형식품 표시 여부','유기식품등 여부','할랄인증 식품 등 해당 여부','식품조사처리 여부','주문자상표부착방식 식품 여부','고열량저영양 식품 해당 여부','영유아를 섭취대상으로 표시하여 판매하는 식품 해당 여부','서류검사 또는 현장검사 생략 대상 여부','고령친화식품 여부','기능성표시일반식품 여부','세트포장 여부','구성제품 수량','포장재 연장 승인 대상 여부','대체식품으로 표시하여 판매하는 식품 여부','수입신고 참고사항'];
 export function blankJob(kind='history'){return {schema:2,id:crypto.randomUUID(),kind,basic:Object.fromEntries(BASIC.map(k=>[k,''])),items:[{품목ID:'P1'}],types:[],labels:[],processes:[],ingredients:[],sources:{}};}
@@ -28,17 +29,34 @@ export function validateIntake(job,{execution=false}={}){
  if(!job||job.schema!==2||!['history','new'].includes(job.kind))return ['작업 형식이 다릅니다.'];
  if(!job.items?.length||job.items.length>300)return ['품목은 1~300개여야 합니다.'];
  if(execution)for(const k of ['선적일','수입화주사업자번호','수입화주명','제조업소등록번호','제조업소명'])require(job.basic[k],k);
- if(execution&&job.kind==='new')for(const k of ['신고제품구분','신고기관','대행업체사업자번호','대행업체허가번호','화주허가번호','보관창고코드','신청인전화','신청인휴대폰','화주휴대폰','용도','생산국','수출국','선적일'])require(job.basic[k],k);
+ if(execution&&job.kind==='new')for(const k of ['신고제품구분','신고기관','대행업체사업자번호','대행업체허가번호','화주허가번호','보관창고코드','검사기관코드','HSK','신청인전화','신청인휴대폰','화주휴대폰','용도','생산국','수출국','선적일'])require(job.basic[k],k);
  if(execution&&job.kind==='new'&&job.basic.신고제품구분!=='가공식품')errors.push('신규 자동 입력 1차 버전은 가공식품을 지원합니다.');
  if(new Set(job.items.map(r=>r.HBL).filter(Boolean)).size>1)errors.push('한 작업에는 같은 H B/L의 품목만 넣어주세요.');
+ if(execution&&job.kind==='new'){
+  try{representativeItem(job.items);}catch(e){errors.push(e.message);}
+  if(new Set(job.items.map(r=>r.수량단위)).size!==1)errors.push('한 신고서의 품목 수량단위는 같아야 합니다.');
+  if(!/^\d{10}$/.test(job.basic.HSK))errors.push('HSK는 10자리 코드로 입력해주세요.');
+ }
  const ids=new Set();for(const [i,r]of job.items.entries()){
   if(!r.품목ID||ids.has(r.품목ID))errors.push(`${i+1}번 품목ID가 없거나 중복됩니다.`);ids.add(r.품목ID);
   if(execution)for(const k of ['제품명','한글명','수량','수량단위','순중량kg','금액USD','소비기한','화물관리번호','HBL','MBL','조회연도'])require(r[k],`${i+1}번 ${k}`);
   for(const k of ['수량','순중량kg','금액USD'])if(r[k]&&!(decimal(r[k])>0))errors.push(`${i+1}번 ${k}: 0보다 큰 숫자가 필요합니다.`);
+  if(execution&&(!/^20\d{2}$/.test(r.조회연도||'')||r.화물관리번호?.slice(0,2)!==r.조회연도?.slice(2)))errors.push(`${i+1}번 화물번호와 조회연도를 확인하세요.`);
+  if(execution&&(!/^[A-Z0-9]{1,20}$/.test(r.HBL||'')||!/^[A-Z0-9]{1,20}$/.test(r.MBL||'')))errors.push(`${i+1}번 MBL·HBL 형식을 확인하세요.`);
   if(r.화물관리번호&&!/^\d{2}[A-Z0-9]{9}\d{8}$/.test(r.화물관리번호))errors.push(`${i+1}번 화물관리번호 형식을 확인하세요.`);
+  if(r.제조일자&&(!/^\d{4}-\d{2}-\d{2}$/.test(r.제조일자)||isNaN(Date.parse(r.제조일자))||new Date(r.제조일자).toISOString().slice(0,10)!==r.제조일자))errors.push(`${i+1}번 제조일자를 확인해주세요.`);
+  if(r.제조일자&&r.소비기한&&r.제조일자>r.소비기한)errors.push(`${i+1}번 제조일자가 소비기한보다 늦습니다.`);
+  if(r.대표품목&&!['예','아니오'].includes(r.대표품목))errors.push('대표품목은 예/아니오로 입력해주세요.');
   if(r.소비기한&&(!/^\d{4}-\d{2}-\d{2}$/.test(r.소비기한)||isNaN(Date.parse(r.소비기한))||new Date(r.소비기한).toISOString().slice(0,10)!==r.소비기한))errors.push(`${i+1}번 소비기한은 YYYY-MM-DD로 입력하세요.`);
  }
- const seen=new Map();for(const r of job.ingredients){
+ const seen=new Map();
+ for(const r of job.ingredients){
+  const children=job.ingredients.filter(c=>c.상위성분ID===r.성분ID);
+  if(execution&&children.length>=2){require(r.제품구분,r.성분명+' 제품구분');if(r.제품구분==='가공식품')require(r.품목유형코드,r.성분명+' 품목유형코드');}
+  if(execution&&['혼합','부혼합'].includes(r.구분)&&children.length<2)errors.push(r.성분명+': 혼합성분은 부성분을 2개 이상 입력해주세요.');
+  if(execution&&r.상위성분ID&&r.비율기준!=='상위성분')errors.push(r.성분명+': 부성분 배합비는 상위성분 기준으로 정리해주세요.');
+ }
+ if(new Set(job.ingredients.map(r=>r.상위성분ID+'|'+r.성분코드)).size!==job.ingredients.length)errors.push('같은 상위 성분의 동일 코드를 합쳐서 정리해주세요.');for(const r of job.ingredients){
   if(!r.성분ID||seen.has(r.성분ID))errors.push('성분ID가 없거나 중복됩니다.');
   if(r.상위성분ID&&!seen.has(r.상위성분ID))errors.push(r.성분명+': 상위 성분을 먼저 적어주세요.');
   if(!['주','부','혼합','부혼합'].includes(r.구분))errors.push(r.성분명+': 성분 구분을 확인하세요.');

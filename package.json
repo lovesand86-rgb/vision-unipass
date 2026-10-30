@@ -16,6 +16,7 @@
     "test:final": "node tests/final-actions.mjs",
     "test:auto-validation": "node tests/auto-validation.mjs",
     "test:handoff": "node tests/attachment-handoff.mjs",
-    "test:intake": "node tests/intake-browser.mjs"
+    "test:intake": "node tests/intake-browser.mjs",
+    "test:new": "node tests/new-browser.mjs"
   }
 }

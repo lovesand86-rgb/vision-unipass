@@ -1,6 +1,6 @@
 import {createRequire} from 'node:module';import assert from 'node:assert/strict';import {readFile,mkdtemp,cp,writeFile,mkdir} from 'node:fs/promises';
 import {declarationStep} from '../extension/search-copy.js';
-import {intakeDOM} from '../extension/intake-dom.js';
+import {newDOM} from '../extension/new-dom.js';
 const require=createRequire(import.meta.url),{chromium}=require('playwright');
 const fixture=await mkdtemp('/tmp/vision-intake-');await cp(new URL('../extension',import.meta.url),fixture,{recursive:true});const manifest=JSON.parse(await readFile(fixture+'/manifest.json'));manifest.host_permissions=manifest.optional_host_permissions;await writeFile(fixture+'/manifest.json',JSON.stringify(manifest));
 const context=await chromium.launchPersistentContext(await mkdtemp('/tmp/vision-intake-profile-'),{executablePath:process.env.VISION_TEST_BROWSER||chromium.executablePath(),headless:true,ignoreDefaultArgs:['--disable-extensions'],args:['--no-sandbox','--load-extension='+fixture],viewport:{width:600,height:760}});
@@ -15,9 +15,9 @@ try{
  const root=new URL('../artifacts/screenshots/',import.meta.url).pathname;await mkdir(root,{recursive:true});await page.screenshot({path:root+'15-folder-intake.png',fullPage:true});
  const form=await context.newPage();await context.route('https://unipass.customs.go.kr/**',r=>r.fulfill({contentType:'text/html',body:'<body></body>'}));await form.goto('https://unipass.customs.go.kr/csp/index.do');
  await form.setContent('<input id="CSW0101001S_reqRqstNo1" value="TEST"><input id="CSW0101001S_reqRqstNo2" value="26"><input id="CSW0101001S_reqRqstNo3"><input id="CSW0101001S_impOwrBrno"><input id="CSW0101001S_mdlStszEnglNmPrlst"><input id="CSW0101001S_dclrQtyPrlst"><table id="CSW0101001S_prlstTbl"></table>');
- const binding=await form.evaluate(intakeDOM,{action:'bind',session:'s'});assert.deepEqual(binding.application,['TEST','26','']);
- let r=await form.evaluate(intakeDOM,{action:'fields',session:'s',application:binding.application,fields:{제품명:'PRODUCT',수량:'10'}});assert.equal(r.status,'filled');
- await form.locator('#CSW0101001S_reqRqstNo3').fill('CHANGED');r=await form.evaluate(intakeDOM,{action:'fields',session:'s',application:binding.application,fields:{수량:'99'}});assert.equal(r.status,'blocked');assert.equal(await form.locator('#CSW0101001S_dclrQtyPrlst').inputValue(),'10');checks.push('new form binding blocks writes after declaration changes');
+ const binding=await form.evaluate(newDOM,{action:'bind',session:'s'});assert.deepEqual(binding.application,['TEST','26','']);
+ let r=await form.evaluate(newDOM,{action:'fields_write',session:'s',application:binding.application,fields:[{label:'제품명',value:'PRODUCT'},{label:'수량',value:'10'}]});assert.equal(r.done,true);
+ await form.locator('#CSW0101001S_reqRqstNo3').fill('CHANGED');r=await form.evaluate(newDOM,{action:'fields_write',session:'s',application:binding.application,fields:[{label:'수량',value:'99'}]});assert.equal(r.status,'blocked');assert.equal(await form.locator('#CSW0101001S_dclrQtyPrlst').inputValue(),'10');checks.push('new form binding blocks writes after declaration changes');
  // Full visible-result accounting is required before ranking history rows.
  const searchJob={format:'vision-unipass-search-copy',version:1,source_application:'TEST-26-A',identity:{product_name:'PRODUCT',importer_name:'IMPORTER',importer_id:'TESTIMPORTER',manufacturer_name:'MAKER',manufacturer_id:'TESTMAKER'},search:{from:'2026-01-01',to:'2026-10-30',product_term:'PRODUCT',importer_term:'IMPORTER'}};
  const ids=['qryStrtDt','qryEndDt','owrEntsConm','reqRqstNo','reqRqstAcapNo','reqIttApreNo','prlstCdCn','blNoCn','cargMtNo','ovrsEntsConm','aplcUserId','reqUserId','dcerSgn'];

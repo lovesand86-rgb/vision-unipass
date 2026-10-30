@@ -1,3 +1,4 @@
+import {runNewIntake} from './intake-runner.js';
 import {templateBase64,guide} from './intake-assets.js';
 import {intakeDOM} from './intake-dom.js';
 import {BASIC,TABLES,blankJob,fromTables,validateIntake,compileTargets,searchPeriods,applyPrevious} from './intake-model.js';
@@ -19,7 +20,7 @@ function applyDefaults(){for(const [k,v]of Object.entries(defaults))if(BASIC.inc
 applyDefaults();
 function field(label,value,change){const l=el('label',label),input=el('input');input.value=value||'';input.setAttribute('aria-label',label);input.onchange=()=>{change(input.value.trim());};l.append(input);return l;}
 function render(){
- $('mode').textContent=job.kind==='new'?'신규 자료 입력':'실적 기반 입력';$('new-data').hidden=job.kind!=='new';$('start').textContent=job.kind==='new'?'신규 화면 연결 확인':'입력 시작';$('find-previous').hidden=job.kind!=='history';
+ $('mode').textContent=job.kind==='new'?'신규 자료 입력':'실적 기반 입력';$('new-data').hidden=job.kind!=='new';$('start').textContent=job.kind==='new'?'신규 입력 시작 · 이어하기':'입력 시작';$('find-previous').hidden=job.kind!=='history';
  const primary=['작업명','수입화주명','수입화주사업자번호','제조업소명','제조업소등록번호','선적일'];
  for(const id of ['basic-primary','basic-more'])$(id).replaceChildren();
  for(const key of [...primary,...BASIC.filter(k=>!primary.includes(k))])$(primary.includes(key)?'basic-primary':'basic-more').append(field(key,job.basic[key],v=>{job.basic[key]=v;discovery=prior=null;}));
@@ -46,7 +47,7 @@ function renderPhotos(){
   const b=el('button',undefined,'file-card');b.setAttribute('aria-pressed',String(selected.has(index)));b.setAttribute('aria-label',file.name);
   if(/\.(png|jpe?g|bmp|gif)$/i.test(file.name)){const img=el('img');img.alt=file.name;img.loading='lazy';img.src=URL.createObjectURL(file);objectURLs.push(img.src);b.append(img);}else b.append(el('div',/\.pdf$/i.test(file.name)?'PDF':'이미지','file-icon'));
   b.append(el('span',file.name),el('b',selected.has(index)?roles[selected.get(index)]:'선택'));b.onclick=()=>{
-   if(selected.has(index))selected.delete(index);else{if(file.size>5000000||!file.size){status('첨부는 파일당 5MB 이하입니다.');return;}if(role==='other'&&[...selected.values()].filter(v=>v==='other').length>=9){status('기타는 최대 9개입니다.');return;}if(role!=='other')for(const [k,v]of selected)if(v===role)selected.delete(k);selected.set(index,role);if(role==='label')role='front';else if(role==='front')role='other';}renderPhotos();};$('gallery').append(b);
+   if(selected.has(index))selected.delete(index);else{if(role==='front'&&/\.pdf$/i.test(file.name)){status('제품 전면에는 사진파일을 선택해주세요. PDF는 기타 서류로 선택할 수 있습니다.');return;}if(file.size>5000000||!file.size){status('첨부는 파일당 5MB 이하입니다.');return;}if(role==='other'&&[...selected.values()].filter(v=>v==='other').length>=9){status('기타는 최대 9개입니다.');return;}if(role!=='other')for(const [k,v]of selected)if(v===role)selected.delete(k);selected.set(index,role);if(role==='label')role='front';else if(role==='front')role='other';}renderPhotos();};$('gallery').append(b);
  });
  $('photo-summary').textContent=Object.entries(roles).map(([k,v])=>v+' '+[...selected.values()].filter(r=>r===k).length).join(' · ');
  $('selected-files').replaceChildren();const others=[...selected].filter(([,r])=>r==='other');others.forEach(([index],i)=>{const row=el('div');row.append(el('span',(i+1)+'. '+files[index].name));for(const delta of [-1,1]){const b=el('button',delta<0?'↑':'↓','button small');b.disabled=i+delta<0||i+delta>=others.length;b.onclick=()=>{[others[i],others[i+delta]]=[others[i+delta],others[i]];selected=new Map([...selected].filter(([,r])=>r!=='other').concat(others));renderPhotos();};row.append(b);}$('selected-files').append(row);});
@@ -124,10 +125,14 @@ on('start',async()=>{
    continueInTool('workflow.html?intake='+encodeURIComponent(job.id)+'&attachments='+encodeURIComponent(transfer)+'&preparedStart=1');
   });
  }else{
-  // Actual new-form lookup contracts have not been captured on the user's PC.
-  // Do not execute speculative site writes. Export a read-only integration report.
   const tab=await chooseUnipassTab();if(!tab)return;
-  await withBusy(async()=>{const frames=await chrome.scripting.executeScript({target:{tabId:tab.id},func:intakeDOM,args:[{action:'diagnostics'}]});diagnostics=frames.find(r=>r.frameId===0)?.result;await draftStore('save',{id:job.id,job,files,selected:[...selected],activeStep,at:Date.now()});log('신규 자료를 저장하고 화면 구조를 읽었습니다. 신규 자동 입력은 실제 조회창 연결 확인 후 활성화됩니다. 이번에는 값을 변경하지 않았습니다.');});
+  if(![...selected.values()].includes('front')||![...selected.values()].includes('label'))throw Error('시작 전에 한글표시 사진과 제품 전면 사진을 선택해주세요.');
+  await withBusy(async()=>{await draftStore('save',{id:job.id,job,files,selected:[...selected],activeStep,at:Date.now()});
+   try{await runNewIntake({job,tabId:tab.id,files:entries(),log,onState:status});}
+   catch(e){
+    diagnostics=[];for(const target of (await chrome.tabs.query({url:'https://unipass.customs.go.kr/*'})).filter(t=>t.id===tab.id||t.openerTabId===tab.id)){try{const frames=await chrome.scripting.executeScript({target:{tabId:target.id},func:intakeDOM,args:[{action:'diagnostics'}]});diagnostics.push(frames.find(r=>r.frameId===0)?.result);}catch{}}
+    log('진행 기록을 보존했습니다. 원래 유니패스 탭에서 필요한 부분을 수정하고 이어하기를 누르세요.');throw e;}
+  });
  }
 });
 on('export-log',()=>{const a=el('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({version:chrome.runtime.getManifest().version,job,logs,diagnostics},null,2)],{type:'application/json'}));a.download='vision-intake-progress.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});

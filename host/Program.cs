@@ -17,7 +17,7 @@ static class Program {
    if(args.Length>0&&args[0].StartsWith("chrome-extension://",StringComparison.Ordinal)){Native(args[0]).GetAwaiter().GetResult();return;}
    ApplicationConfiguration.Initialize();
    if(args.Contains("--open-delayed")){Thread.Sleep(1800);Open(ReadConfig());return;}
-   if(!File.Exists(Settings)||args.Contains("--setup")){Application.Run(new SetupForm());return;}
+   if(!File.Exists(Settings)||args.Contains("--setup")||Path.GetFileName(Environment.ProcessPath!).EndsWith("-setup.exe",StringComparison.OrdinalIgnoreCase)){Application.Run(new SetupForm());return;}
    var c=ReadConfig();using(var gate=Lock())UpdateCore.Recover(c.target,State);Register(c);Open(c);
   }catch(Exception e){if(args.Length>0&&args[0].StartsWith("chrome-extension://")){try{WriteNative(new{ok=false,message=e.Message});}catch{}}else MessageBox.Show(e.Message,"비전 어시스트",MessageBoxButtons.OK,MessageBoxIcon.Information);}
  }
@@ -35,6 +35,7 @@ static class Program {
   string temp=Path.Combine(Path.GetTempPath(),"vision-assist-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(temp);
   try{
    var feed=await UpdateCore.FetchFeed(temp);var current=UpdateCore.Manifest(config.target)["version"]!.GetValue<string>();
+   if(command=="check"&&Version.Parse(feed.version)<Version.Parse(current)){WriteNative(new{ok=true,available=false,version=current,message="공개 최신 버전보다 새로운 테스트 버전을 사용 중입니다."});return;}
    if(Version.Parse(feed.version)<Version.Parse(current)||Version.Parse(feed.version)<Version.Parse(config.highestVersion))throw new IOException("현재 또는 이전에 확인한 버전보다 오래된 업데이트입니다.");
    // Manifest serialization differs after preserving extension identity; compare its version separately.
    bool available=feed.version!=current||feed.files.Where(f=>f.path!="manifest.json").Any(f=>!File.Exists(Path.Combine(config.target,f.path))||UpdateCore.Hash(Path.Combine(config.target,f.path))!=f.sha256);
