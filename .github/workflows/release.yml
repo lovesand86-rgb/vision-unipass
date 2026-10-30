@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths: ['.github/workflows/release.yml']
   workflow_dispatch:
+    inputs:
+      preview:
+        description: Publish a separate prerelease without changing latest
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -15,6 +20,7 @@ jobs:
     env:
       PYTHONUTF8: '1'
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      PREVIEW: ${{ inputs.preview || false }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -29,13 +35,14 @@ jobs:
       - name: Read release version
         shell: pwsh
         run: |
+          if ($env:PREVIEW -ne 'true' -and '${{ github.ref_name }}' -ne 'main') { throw 'Non-main releases must use preview=true.' }
           $version = (Get-Content extension/manifest.json -Raw | ConvertFrom-Json).version
           "RELEASE_VERSION=$version" >> $env:GITHUB_ENV
           "RELEASE_TAG=v$version" >> $env:GITHUB_ENV
       - name: Check model and updater recovery
         shell: pwsh
         run: |
-          node --test --test-isolation=none tests/model.test.mjs tests/sequence.test.mjs tests/final-messages.test.mjs
+          node --test tests/*.test.mjs
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           dotnet run --project tests/CoreTests.csproj
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
@@ -50,10 +57,15 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist -Force
-          Copy-Item artifacts/windows/VisionAssist.exe "dist/VisionAssist-${env:RELEASE_VERSION}-win-x64.exe"
-          Copy-Item artifacts/update.json,artifacts/vision-extension-core.zip,release/START-HERE.ko.txt,release/VisionAssist-home.png,release/VisionAssist-workspace.png dist/
-          git archive --format=zip --output="dist/VisionAssist-${env:RELEASE_VERSION}-source.zip" HEAD
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($env:PREVIEW -eq 'true') {
+            Copy-Item artifacts/windows/VisionAssist.exe "dist/VisionAssist-${env:RELEASE_VERSION}-setup.exe"
+            Copy-Item artifacts/update.json,artifacts/vision-extension-core.zip,docs/intake-template.xlsx,docs/intake-guide.txt dist/
+          } else {
+            Copy-Item artifacts/windows/VisionAssist.exe "dist/VisionAssist-${env:RELEASE_VERSION}-win-x64.exe"
+            Copy-Item artifacts/update.json,artifacts/vision-extension-core.zip,release/START-HERE.ko.txt,release/VisionAssist-home.png,release/VisionAssist-workspace.png dist/
+            git archive --format=zip --output="dist/VisionAssist-${env:RELEASE_VERSION}-source.zip" HEAD
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
           $lines = Get-ChildItem dist -File | Sort-Object Name | ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" }
           $lines | Set-Content -Encoding utf8NoBOM dist/SHA256SUMS.txt
       - name: Upload and publish reviewed release
@@ -61,19 +73,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $notes = if ($env:PREVIEW -eq 'true') { "release/PREVIEW-${env:RELEASE_VERSION}.ko.md" } else { 'release/NOTES.ko.md' }
+          $title = "비전 어시스트 $env:RELEASE_VERSION" + $(if ($env:PREVIEW -eq 'true') { ' 테스트' } else { '' })
           $existing = gh release view $env:RELEASE_TAG --json isDraft 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --draft --target "${{ github.sha }}" --title "비전 어시스트 $env:RELEASE_VERSION" --notes-file release/NOTES.ko.md
+            gh release create $env:RELEASE_TAG --draft --target "${{ github.sha }}" --title $title --notes-file $notes
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           } elseif (-not ($existing | ConvertFrom-Json).isDraft) {
             throw 'This version is already public. Bump the version instead of replacing published files.'
           }
-          gh release edit $env:RELEASE_TAG --target "${{ github.sha }}" --notes-file release/NOTES.ko.md
+          gh release edit $env:RELEASE_TAG --target "${{ github.sha }}" --title $title --notes-file $notes
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $assets = (Get-ChildItem dist -File).FullName
           gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $release = gh release view $env:RELEASE_TAG --json assets | ConvertFrom-Json
-          if ($release.assets.Count -ne 8) { throw 'Expected eight release assets.' }
-          gh release edit $env:RELEASE_TAG --draft=false --latest
+          $expected = if ($env:PREVIEW -eq 'true') { 6 } else { 8 }
+          if ($release.assets.Count -ne $expected) { throw 'Unexpected release asset count.' }
+          if ($env:PREVIEW -eq 'true') {
+            gh release edit $env:RELEASE_TAG --draft=false --prerelease --latest=false
+          } else {
+            gh release edit $env:RELEASE_TAG --draft=false --latest
+          }
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

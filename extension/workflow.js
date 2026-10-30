@@ -3,7 +3,8 @@ import {putAttachments} from './attachment-handoff.js';
 import {guardToolNavigation,continueInTool} from './assist-navigation.js';
 import {watchLabelNotice} from './label-notice.js';
 import {declarationStep} from './search-copy.js';
-import * as targets from './cargo-target.js';
+import {runtimeTargets} from './runtime-targets.js';
+const targets=await runtimeTargets();
 const $ = id => document.getElementById(id);
 const key = 'visionCopyAttemptV1';
 const origin = 'https://unipass.customs.go.kr/*';
@@ -216,7 +217,7 @@ async function lockedRun(checkOnly,chain=false,resumeOnly=false) {
   finally { busy = false; refresh(); }
   // The shared lock and notice debugger have been released before handoff.
   if(handoff!==null){
-    try{const app=await chrome.tabs.getCurrent();const transfer=await putAttachments(photos.files(),{appTab:app.id,targetTab:handoff,jobKey:JSON.stringify(targets.cargoTarget)});continueInTool('cargo-workflow.html?tab='+handoff+'&prepared='+transfer);}
+    try{const app=await chrome.tabs.getCurrent();const transfer=await putAttachments(photos.files(),{appTab:app.id,targetTab:handoff,jobKey:JSON.stringify(targets.cargoTarget)});continueInTool('cargo-workflow.html?tab='+handoff+'&prepared='+transfer+(new URL(location.href).searchParams.get('intake')?'&intake='+encodeURIComponent(new URL(location.href).searchParams.get('intake')):''));}
     catch(error){log('준비한 첨부를 연결하지 못했습니다. 파일은 이 화면에 유지됩니다. '+error.message);}
   }
   return needsList;
@@ -273,7 +274,11 @@ $('close-attempt').addEventListener('click', async () => {
   finally { busy = false; refresh(); }
   if(cleared){photos.restore([]);status('다음 건의 사진·서류를 준비하고 시작하기를 누르세요.');$('workflow-photo-panel').scrollIntoView({block:'start'});}
 });
+const preparedId=new URL(location.href).searchParams.get('attachments');
+if(preparedId){try{const app=await chrome.tabs.getCurrent();const {takeAttachments}=await import('./attachment-handoff.js');photos.restore(await takeAttachments(preparedId,{appTab:app.id,targetTab:app.id,jobKey:JSON.stringify(targets.searchTarget)}));}catch(e){job=null;status(e.message);}}
 showJob();
 refresh();
 
 guardToolNavigation(()=>busy||starting);
+
+if(job&&preparedId&&new URL(location.href).searchParams.get('preparedStart')==='1')$('start-sequence').click();

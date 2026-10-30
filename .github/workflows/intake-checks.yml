@@ -1,0 +1,56 @@
+name: Intake preview checks
+on:
+  pull_request:
+    paths: ['extension/**', 'host/**', 'tools/**', 'tests/**', 'docs/intake-template.xlsx', '.github/workflows/intake-checks.yml']
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-save --package-lock=false playwright@1.62.1
+      - run: npx playwright install --with-deps chromium
+      - run: node --test tests/*.test.mjs
+      - run: node tests/intake-browser.mjs
+      - run: node tests/new-browser.mjs
+      - run: node tests/library-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: intake-preview-screenshots
+          path: artifacts/screenshots/*.png
+
+  windows-preview:
+    needs: browser
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.427'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test updater recovery
+        run: dotnet run --project tests/CoreTests.csproj
+      - name: Package extension
+        run: python tools/package.py
+      - name: Build installer
+        run: dotnet publish host/VisionAssist.csproj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.33 -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/windows
+      - name: Name installer
+        shell: pwsh
+        run: Copy-Item artifacts/windows/VisionAssist.exe artifacts/VisionAssist-preview-setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vision-windows-preview
+          path: |
+            artifacts/VisionAssist-preview-setup.exe
+            artifacts/vision-extension-core.zip
+            artifacts/update.json

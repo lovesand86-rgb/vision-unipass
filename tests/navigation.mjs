@@ -10,7 +10,7 @@ try{
 const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');const base='chrome-extension://'+new URL(worker.url()).host+'/';
 const app=await context.newPage();await app.goto(base+'assist.html');
 const initialTabs=await app.evaluate(()=>chrome.tabs.query({}).then(ts=>ts.map(t=>t.id)));const appId=await app.evaluate(()=>chrome.tabs.getCurrent().then(t=>t.id));
-await app.getByRole('button',{name:'실적 기반 입력',exact:false}).click();await app.locator('#history-start').click();await app.waitForURL(base+'workflow.html');await app.locator('#workflow-status').waitFor({state:'attached'});
+await app.getByRole('button',{name:'실적 기반 입력',exact:false}).click();await app.getByText('다른 작업',{exact:true}).click();await app.locator('#legacy-start').click();await app.waitForURL(base+'workflow.html');await app.locator('#workflow-status').waitFor({state:'attached'});
 assert.equal(await app.evaluate(()=>chrome.tabs.getCurrent().then(t=>t.id)),appId);assert.deepEqual(await app.evaluate(()=>chrome.tabs.query({}).then(ts=>ts.map(t=>t.id))),initialTabs);
 await app.screenshot({path:root+'/artifacts/screenshots/06-integrated-search.png',fullPage:true});
 await app.getByRole('link',{name:'설정',exact:true}).click();await app.getByRole('dialog').waitFor();await app.getByRole('button',{name:'닫기',exact:true}).click();
@@ -39,7 +39,7 @@ await app.getByRole('link',{name:'실적 기반 입력'}).click();await app.getB
 await app.screenshot({path:root+'/artifacts/screenshots/08-integrated-detail-compact.png',fullPage:true});
 // The simplified screen works for an imported search-only job too.
 await app.setViewportSize({width:920,height:760});await app.goto(base+'assist.html?view=history');await app.screenshot({path:root+'/artifacts/screenshots/09-simple-choices.png'});
-await app.locator('#history-start').click();await app.waitForURL(base+'workflow.html');
+await app.getByText('다른 작업',{exact:true}).click();await app.locator('#legacy-start').click();await app.waitForURL(base+'workflow.html');
 assert.equal(await app.locator('#start-sequence').isDisabled(),true);
 assert.equal(await app.locator('#more-tools').evaluate(el=>el.open),false);
 const job={format:'vision-unipass-search-copy',version:1,identity:{product_name:'테스트 제품',importer_name:'테스트 업체'},search:{from:'2026-01-01',to:'2026-10-26'},source_application:'TEST-001'};
