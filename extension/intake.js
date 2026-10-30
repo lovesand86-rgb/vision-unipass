@@ -22,6 +22,7 @@ function applyDefaults(){for(const [k,v]of Object.entries(defaults))if(BASIC.inc
 applyDefaults();
 function field(label,value,change){const l=el('label',label),input=el('input');input.value=value||'';input.setAttribute('aria-label',label);if(['선적일','제조일자','소비기한','반입일'].includes(label))input.type='date';input.onchange=()=>{change(input.value.trim());scheduleDraft();};l.append(input);return l;}
 function render(){
+ document.querySelector('main').dataset.jobId=job.id;
  renderPickers();$('mode').textContent=job.kind==='new'?'신규 입력':'실적 기반 입력';$('start').textContent=job.kind==='new'?'신규 입력 시작 · 이어하기':'입력 시작';$('find-previous').hidden=job.kind!=='history';
  for(const id of ['basic-primary','basic-more','shipment-more','shipment-cargo','product-items','items'])$(id).replaceChildren();
  $('basic-primary').append(field('선적일',job.basic.선적일,v=>job.basic.선적일=v));
@@ -47,7 +48,7 @@ function render(){
   });
   const add=el('button','＋ 행 추가','button small');add.onclick=()=>{job[key].push(Object.fromEntries(TABLES[name].map(k=>[k,''])));render();scheduleDraft();};wrap.append(table);details.append(summary,wrap,add);$('tables').append(details);
  }
- renderLabels();renderPhotos();
+ renderLabels();renderPhotos();if(busy)document.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=true);
 }
 function previousFor(index){
  if(prior&&index===0)return prior;const p=library.products.find(p=>p.id===job.library?.productId);
@@ -179,7 +180,7 @@ on('owner-select',async()=>{const id=$('owner-select').value;if(!await allowSwit
 on('product-select',async()=>{const id=$('product-select').value;if(!id)return;if(!await allowSwitch()){renderPickers();return;}job=useProduct(library,id,job.kind);clearSelection();$('registration').open=false;render();scheduleDraft();status('기본정보를 불러왔습니다. 이번 선적의 값과 사진만 넣으세요.');},'change');
 on('product-search',renderPickers,'input');
 on('new-product',async()=>{if(!await allowSwitch())return;job=blankJob(job.kind);applyDefaults();const o=library.owners.find(o=>o.id===ownerId);if(o)Object.assign(job.basic,o.basic);clearSelection();render();$('registration').open=true;$('registration').scrollIntoView({behavior:'smooth'});});
-on('next-job',async()=>{if(!await allowSwitch())return;const id=job.library?.productId;job=id?useProduct(library,id,job.kind):blankJob(job.kind);applyDefaults();clearSelection(true);render();setStep(0);status('새 작업입니다. 이전 화물번호·수량·날짜·사진 선택을 비웠습니다.');});
+on('next-job',()=>withBusy(async()=>{if(!await allowSwitch())return;const id=job.library?.productId;job=id?useProduct(library,id,job.kind):blankJob(job.kind);applyDefaults();clearSelection(true);render();setStep(0);status('새 작업입니다. 이전 화물번호·수량·날짜·사진 선택을 비웠습니다.');}));
 on('save-current',()=>$('save-profile').click());
 on('save-profile',()=>withBusy(async()=>{
  let ref;library=await changeLibrary(old=>{const result=upsertJob(old,job);ref=result.ref;return result.library;});job.library=ref;ownerId=ref.ownerId;defaults=library.company;render();$('registration').open=false;await saveDraft();status('화주·제품을 저장했습니다. 다음부터 목록에서 선택하면 됩니다.');
