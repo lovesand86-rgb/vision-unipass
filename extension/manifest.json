@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "비전 어시스트",
-  "version": "1.0.11",
+  "version": "1.1.0",
   "description": "실적 기반 입력과 신규 자료 입력, 작업 이어하기, 업데이트를 한곳에서 관리합니다.",
   "permissions": [
     "activeTab",
@@ -35,5 +35,6 @@
     "16": "assist-icon.png",
     "48": "assist-icon.png",
     "128": "assist-icon.png"
-  }
+  },
+  "version_name": "1.1.0 개발 미리보기"
 }

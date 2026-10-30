@@ -1,4 +1,4 @@
-export const VERSION='1.0.11';
+export const VERSION='1.1.0';
 export const STORAGE='visionAssistStateV1';
 export const emptyState=()=>({schema:1,revision:0,jobs:[],settings:{checkOnOpen:false},activeJob:null});
 export function validateJob(job,{complete=false}={}){

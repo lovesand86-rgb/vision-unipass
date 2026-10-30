@@ -135,6 +135,32 @@ export async function declarationStep(request) {
     click('btnQry', '조회');
     return {status: 'query_requested'};
   }
+  if(request.action==='candidates'){
+    if(!isList())fail('처리현황 화면이 아닙니다.');
+    const state=window.__visionSearchState;
+    if(!state||state.token!==request.token||state.filters!==JSON.stringify(filters()))fail('검색 대상이 바뀌었습니다.');
+    if(!state.changed||Date.now()-state.lastChange<600)return {status:'waiting'};
+    const table=listControl('qryTbl1'),out=[];
+    const visibleCounts=[...document.querySelectorAll('strong[data-recordCount]')].filter(visible).map(e=>Number(text(e).replace(/,/g,'')));
+    const totalCounts=[...document.querySelectorAll('span,div,p')].filter(e=>visible(e)&&/^총\s*[\d,]+\s*건$/.test(text(e))).map(e=>Number(text(e).replace(/[^\d]/g,'')));
+    const counts=[...new Set([...visibleCounts,...totalCounts])];
+    const loaded=table.querySelectorAll('input[type=checkbox][name=check]').length;
+    if(counts.length!==1||counts[0]!==loaded)fail('전체 실적 건수와 현재 목록을 대조하지 못했습니다. 최신 실적을 임의로 선택하지 않았습니다.');
+    for(const check of table.querySelectorAll('input[type=checkbox][name=check]')){
+      const rows=[check.closest('tr')];for(let row=rows[0].nextElementSibling;row&&!row.querySelector('input[name=check]');row=row.nextElementSibling)rows.push(row);
+      if(rows.length!==3)fail('실적 목록 구조를 확인해야 합니다.');
+      const cells=rows.flatMap(r=>[...r.querySelectorAll('td')]).map(text),combined=cells.join(' ');
+      if(!cells.some(v=>norm(v)===norm(job.identity.product_name))||!cells.some(v=>company(v)===company(job.identity.importer_name))||!cells.some(v=>norm(v)===norm(job.identity.manufacturer_name))||!combined.includes('통관완료')||/취하|취소|반려/.test(combined))continue;
+      const applications=rows.flatMap(r=>[...r.querySelectorAll('a')]).map(text).filter(v=>/^[A-Z0-9]+-\d{2}-[A-Z0-9]+$/.test(v));
+      const dates=cells.filter(v=>/^\d{4}-\d{2}-\d{2}(?:\s|$)/.test(v)).map(v=>v.slice(0,10));
+      if(applications.length!==1||!dates.length)fail('실적 신청번호·일자를 확인하지 못했습니다.');
+      out.push({application:applications[0],date:dates[0]});
+    }
+    // Do not call the first result the latest when additional pages were not read.
+    const pages=[...document.querySelectorAll('a')].filter(e=>visible(e)&&/^(?:다음|다음페이지|2)$/.test(norm(text(e)))&&/page|paging/i.test((e.className||'')+' '+(e.parentElement?.className||'')+' '+(e.getAttribute('onclick')||'')));
+    if(pages.length)fail('검색 결과가 여러 페이지입니다. 최신 실적 확정을 위해 조회 기간을 줄여주세요.');
+    return {status:'candidates',candidates:out.sort((a,b)=>b.date.localeCompare(a.date))};
+  }
   const listRecord = () => {
     if (!isList()) fail('조회 화면이 바뀌었습니다.');
     const state = window.__visionSearchState;
@@ -199,7 +225,15 @@ export async function declarationStep(request) {
   };
   if (request.action === 'original' || request.action === 'copy') {
     const signature = originalIdentity();
-    if (request.action === 'original') return {status: 'original_matched', signature};
+    if (request.action === 'original') {
+      let previous=null;
+      const grid=one('CSW0101002S_prlstTbl'),radio=grid.querySelector('input[type=radio]'),row=radio?.closest('tr');
+      const val=e=>e?.querySelector('input[readonly]')?.value||text(e||document.createElement('span'));
+      const units=[...document.querySelectorAll('th')].filter(e=>norm(text(e))==='총수량').map(e=>text(e.nextElementSibling));
+      const unit=units.map(v=>v.match(/(?:EA|CT|CTN|KG|개|카톤|케이스)\s*$/i)?.[0]?.trim()).filter(Boolean);
+      if(row?.cells.length>=5&&unit.length===1&&/US\$|USD/.test(val(row.cells[4])))previous={product:job.identity.product_name,unit:unit[0],currency:'USD',수량:val(row.cells[2]).replace(/,/g,''),순중량kg:val(row.cells[3]).replace(/,|\s*kg/gi,''),금액USD:val(row.cells[4]).replace(/,|\s*\(US\$\)|USD/gi,'').trim()};
+      return {status:'original_matched',signature,previous};
+    }
     if (signature !== request.signature) fail('원문이 확인 이후 바뀌었습니다.');
     if (window.__visionCopyClicked) fail('이 창에서는 이미 복사를 요청했습니다. 결과 확인 전 다시 실행하지 않습니다.');
     window.__visionCopyClicked = true;
