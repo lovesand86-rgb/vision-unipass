@@ -88,11 +88,13 @@ export async function runNewIntake({job,tabId,files,log=()=>{},onState=()=>{},tr
   await step(`제품유형 ${i+1} 행`,()=>call({action:'grid_read',grid:'types',minimum:i+1}),async()=>{const r=await call({action:'grid_read',grid:'types',count:i});if(!r.done)throw Error('제품유형 행 수가 예상과 다릅니다.');await call({action:'grid_add',grid:'types',key:`type:${i}`,count:i});});
   await lookup(`제품유형 ${i+1} 조회`,{grid:'types',index:i,fields:[['제품유형코드',type.제품유형코드]],code:type.제품유형코드,name:type.제품유형명});
  }
+ if(!(await call({action:'grid_read',grid:'types',count:job.types.length})).done)throw Error('예상하지 않은 제품유형 행이 있습니다.');
  await tab('labels');await poll(()=>call({action:'notice',kind:'label'}));
  for(const [i,row]of job.labels.entries()){
   await step(`표시사항 ${i+1} 행`,()=>call({action:'grid_read',grid:'labels',minimum:i+1}),()=>call({action:'grid_add',grid:'labels',count:i,key:`label:${i}`}));
   const values=[row.표시사항코드,row.명칭,row.내용];await step(`표시사항 ${i+1} 입력`,()=>call({action:'label_read',index:i,values}),()=>call({action:'label_write',index:i,values}),{idempotent:true});
  }
+ if(!(await call({action:'grid_read',grid:'labels',count:job.labels.length})).done)throw Error('예상하지 않은 표시사항 행이 있습니다.');
  await tab('processes');const codes=[...job.processes].sort((a,b)=>Number(a.순서)-Number(b.순서)).map(r=>r.공정코드);
  await step('제조공정 등록',()=>call({action:'grid_read',grid:'processes',codes}),async()=>{
   await transient('제조공정 선택',()=>call({action:'process_editor',codes}),()=>popup({process:true,codes,lookupKey:state.session+':process'}));
@@ -103,20 +105,21 @@ export async function runNewIntake({job,tabId,files,log=()=>{},onState=()=>{},tr
  async function resolveCompleted(){
   const actual=(await call({action:'ingredients_read'})).rows;resolved.clear();
   for(const expected of plan){const parent=expected.상위성분ID?resolved.get(expected.상위성분ID)?.sequence:'';if(parent===undefined)continue;
-   const matches=actual.filter(a=>a.code===expected.성분코드&&a.parent===parent);if(matches.length>1)throw Error('같은 상위 성분에 동일 코드가 여러 개입니다.');if(matches.length)resolved.set(expected.성분ID,matches[0]);
+   const matches=actual.filter(a=>a.code===expected.성분코드&&a.parent===parent&&a.kind.replace(/성분/g,'')===expected.구분);if(matches.length>1)throw Error('같은 상위 성분에 동일 코드가 여러 개입니다.');if(matches.length)resolved.set(expected.성분ID,matches[0]);
   }return actual;
  }
  for(const [i,row]of plan.entries()){
   await resolveCompleted();const parent=row.상위성분ID?resolved.get(row.상위성분ID)?.sequence:'';if(parent===undefined)throw Error('상위 성분 반영을 확인하지 못했습니다.');
   const name=`성분 ${row.성분ID} 행`;
   const readRow=async()=>{const actual=await resolveCompleted();const existing=resolved.get(row.성분ID);if(existing)return {done:true,proof:existing};
-   const blanks=actual.filter(a=>!a.code&&a.parent===parent);if(blanks.length>1)throw Error('미입력 성분 행이 여러 개입니다.');return {done:blanks.length===1,proof:blanks[0]||{count:actual.length}};};
+   const blanks=actual.filter(a=>!a.code&&a.parent===parent&&a.kind.replace(/성분/g,'')===row.구분);if(blanks.length>1)throw Error('미입력 성분 행이 여러 개입니다.');return {done:blanks.length===1,proof:blanks[0]||{count:actual.length}};};
   await step(name,readRow,async()=>{await call({action:'ingredient_add',count:i,parent,kind:row.구분,key:name});});
   const current=(await readRow()).proof;
   await lookup(`성분 ${row.성분ID} 코드`,{grid:'ingredients',sequence:current.sequence,fields:[['식약성분코드',row.성분코드]],code:row.성분코드,name:row.성분명});
   await resolveCompleted();const target=resolved.get(row.성분ID);if(!target)throw Error('성분 연결을 확인하지 못했습니다.');
   const args={sequence:target.sequence,parent:target.parent,code:row.성분코드,value:row.배합비율};await step(`성분 ${row.성분ID} 배합비`,()=>call({action:'ratio_read',...args}),()=>call({action:'ratio_write',...args}),{idempotent:true});
  }
+ const finalIngredients=await resolveCompleted();if(finalIngredients.length!==plan.length||resolved.size!==plan.length)throw Error('성분 목록에 예상하지 않은 행이나 연결이 있습니다.');
  // Conditional ingredient product classification is entered after children make it editable.
  for(const row of plan.filter(r=>r.제품구분)){await resolveCompleted();const target=resolved.get(row.성분ID);const args={sequence:target.sequence,code:row.성분코드,value:row.제품구분};await step(`성분 ${row.성분ID} 제품구분`,()=>call({action:'ingredient_detail_read',...args}),()=>call({action:'ingredient_detail_write',...args}),{idempotent:true});if(row.품목유형코드)await lookup(`성분 ${row.성분ID} 품목유형`,{grid:'ingredients',sequence:target.sequence,detail:true,fields:[['제품유형코드',row.품목유형코드]],code:row.품목유형코드,name:row.품목유형명});}
  await tab('attachments');await poll(()=>call({action:'notice',kind:'attachment'}));

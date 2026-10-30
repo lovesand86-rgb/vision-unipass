@@ -70,6 +70,9 @@ export async function newDOM(q){
    if(op.document.documentElement.dataset.visionNewSession!==q.session||['reqRqstNo1','reqRqstNo2','reqRqstNo3'].some((k,i)=>op.document.getElementById(p+k)?.value.trim()!==q.application[i]))stop('조회 대상 신청서가 바뀌었습니다.');
    const bound=op.__visionNewBound;if(!bound||bound.session!==q.session||bound.number!==op.document.getElementById(p+'reqRqstNo3'))stop('조회 대상 폼이 교체됐습니다.');
    const marker=op.document.documentElement.dataset.visionLookup;if(marker!==q.lookupKey||!q.process&&!op.__visionLookupCell?.isConnected)stop('조회 대상 입력칸이 바뀌었습니다.');
+   const binding=op.__visionLookupBinding,c=op.__visionLookupCell;if(!binding||binding.session!==q.session)stop('조회 연결 기록이 없습니다.');
+   if(c&&(c.closest('tr')?.sectionRowIndex!==binding.rowIndex||JSON.stringify([...c.querySelectorAll('input,select,textarea')].map(e=>[e.id,e.value]))!==binding.values))stop('조회하는 동안 대상 행이 바뀌었습니다.');
+   if(JSON.stringify(['impOwrBrno','mnfcCoPermDclrNo'].map(k=>op.document.getElementById(p+k)?.value||''))!==binding.identity)stop('조회하는 동안 화주·제조업소가 바뀌었습니다.');
   };
   if(q.action==='navigate'){
    if(q.readOnly)return {done:!!id('reqRqstNo3')};
@@ -144,7 +147,7 @@ export async function newDOM(q){
    const c=lookupCell();return {done:controls(c).some(e=>norm(e.value)===norm(q.code)),proof:controls(c).map(e=>[e.id,e.value])};
   }
   if(q.action==='lookup_open'){
-   const c=q.process?null:lookupCell();window.__visionLookupCell=c;document.documentElement.dataset.visionLookup=q.lookupKey;
+   const c=q.process?null:lookupCell();window.__visionLookupCell=c;window.__visionLookupBinding={session:q.session,rowIndex:c?.closest('tr')?.sectionRowIndex,values:c?JSON.stringify([...c.querySelectorAll('input,select,textarea')].map(e=>[e.id,e.value])):null,identity:JSON.stringify(['impOwrBrno','mnfcCoPermDclrNo'].map(k=>id(k)?.value||''))};document.documentElement.dataset.visionLookup=q.lookupKey;
    const b=q.process?button('일괄검색'):searchButton(c);b.click();return {opened:true};
   }
   if(q.action==='items_read'){
@@ -195,7 +198,7 @@ export async function newDOM(q){
   if(q.action.startsWith('file_')){
    if(!(q.slot===0||Number.isInteger(q.slot)&&q.slot>=9&&q.slot<=18))stop('첨부 위치가 다릅니다.');const t=table('attachments'),r=t.rows[q.slot],input=r?.querySelector('input[type=file]');if(!input)stop('첨부 선택칸이 없습니다.');
    const hash=async f=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',await f.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');
-   if(q.action==='file_read'){const f=input.files[0];return {done:!!f&&f.name===q.meta.name&&f.size===q.meta.size&&await hash(f)===q.meta.sha256};}
+   if(q.action==='file_read'){const f=input.files[0],method=r.querySelector('select')||t.rows[9]?.querySelector('select');return {done:!!f&&!!method&&sameValue(method,'파일첨부')&&f.name===q.meta.name&&f.size===q.meta.size&&await hash(f)===q.meta.sha256};}
    window.__visionNewFiles??={};
    if(q.action==='file_begin'){
     if(input.files.length||!/\.(png|jpe?g|bmp|gif|tiff?|pdf)$/i.test(q.meta.name)||q.meta.size<1||q.meta.size>5000000)stop('기존 파일·형식·크기를 확인해주세요.');
