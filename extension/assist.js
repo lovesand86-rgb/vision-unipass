@@ -5,6 +5,7 @@ import {openTool} from './assist-navigation.js';
 import {VERSION,emptyState,newJob,validateJob,parseRows,readImport,cleanExport} from './assist-model.js';
 import {assistFill} from './assist-fill.js';
 const $=id=>document.getElementById(id), main=$('main');
+$('version').textContent='v'+VERSION;
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=n=>`<svg aria-hidden="true"><use href="#i-${n}"/></svg>`;
 const extension=!!globalThis.chrome?.runtime?.id;
@@ -27,7 +28,7 @@ async function home(){if(!ensureLeave())return;dirty=false;job=null;capture=prev
 function renderHome(){
  void sizeAssistWindow(true);
  const count=state.jobs.length;
- main.innerHTML=`<section class="home"><h1>무엇을 할까요?</h1><section id="applicant-contact" class="contact-card"></section><div class="tiles"><button class="tile primary" id="history">${icon('history')}<strong>실적 기반 입력</strong><small>이전 실적에서 간편하게</small></button><button class="tile" id="new">${icon('new')}<strong>신규 자료 입력</strong><small>폴더의 신고자료로 간편하게</small></button><button class="tile" id="resume">${icon('resume')}<strong>작업 이어하기${count?`<span class="work-count">${count}</span>`:''}</strong><small>남겨둔 작업을 이어서</small></button><button class="tile" id="update">${icon('update')}<strong>업데이트 확인</strong><small>항상 편리한 작업 환경</small></button></div>${extension?'':'<p class="muted">디자인 미리보기 · PC 연결 기능은 설치 후 사용할 수 있습니다.</p>'}</section>`;
+ main.innerHTML=`<section class="home"><h1>무엇을 할까요?</h1><section id="applicant-contact" class="contact-card"></section><div class="tiles"><button class="tile primary" id="history">${icon('history')}<strong>실적 기반 입력</strong><small>이전 실적에서 간편하게</small></button><button class="tile" id="new">${icon('new')}<strong>신규 자료 입력</strong><small>폴더의 자료로 시작</small></button><button class="tile" id="resume">${icon('resume')}<strong>작업 이어하기${count?`<span class="work-count">${count}</span>`:''}</strong><small>남겨둔 작업을 이어서</small></button><button class="tile" id="update">${icon('update')}<strong>업데이트 확인</strong><small>항상 편리한 작업 환경</small></button></div>${extension?'':'<p class="muted">디자인 미리보기 · PC 연결 기능은 설치 후 사용할 수 있습니다.</p>'}</section>`;
  if(extension)mountContact($('applicant-contact')).catch(e=>toast(e.message));
  on('history',history);on('new',()=>openTool('intake.html?kind=new')); on('resume',jobs);on('update',updates);
 }
